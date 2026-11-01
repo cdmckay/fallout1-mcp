@@ -23,6 +23,23 @@ void RedrwDMPrk();
 // MCP
 bool editor_is_open();
 
+// MCP: An event code the agent injects into the character screen to select a
+// skill for the slider keys, as clicking its name does: this plus the skill.
+#define EDITOR_SELECT_SKILL_CODE 0x7000
+
+// MCP: What the perk dialog's list is offering.
+typedef enum EditorChoice {
+    EDITOR_CHOICE_PERK,
+    EDITOR_CHOICE_TAG_SKILL, // Tag!'s extra tag skill
+    EDITOR_CHOICE_LOSE_TRAIT, // Mutate!'s trait to give up
+    EDITOR_CHOICE_NEW_TRAIT, // and the one to take instead
+} EditorChoice;
+
+// MCP
+int editor_selected_skill();
+void editor_level_up_preview(int* skillPoints, bool* perk);
+int editor_choice(int* kind, int* ids, int max, int* selected);
+
 } // namespace fallout
 
 #endif /* FALLOUT_GAME_EDITOR_H_ */

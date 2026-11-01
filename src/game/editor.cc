@@ -747,6 +747,16 @@ int editor_design(bool isCreationMode)
             InfoButton(keyCode);
         } else if (keyCode == 535) {
             FldrButton();
+        } else if (keyCode >= EDITOR_SELECT_SKILL_CODE && keyCode < EDITOR_SELECT_SKILL_CODE + SKILL_COUNT) {
+            // MCP: Selects a skill without the mouse, as InfoButton(531) does.
+            skill_cursor = keyCode - EDITOR_SELECT_SKILL_CODE;
+            info_line = skill_cursor + 61;
+            ListTraits();
+            ListSkills(0);
+            PrintLevelWin();
+            DrawFolder();
+            ListDrvdStats();
+            DrawInfoWin();
         } else if (keyCode == 521
             || keyCode == 523
             || keyCode == KEY_ARROW_RIGHT
@@ -5295,6 +5305,8 @@ static void RedrwDPrks()
 // 0x436178
 static int perks_dialog()
 {
+    McpScreen mcpScreen("perk_choice"); // MCP: for the state view
+
     crow = 0;
     cline = 0;
     old_fid2 = -1;
@@ -5495,9 +5507,17 @@ static int perks_dialog()
     return rc;
 }
 
+// MCP: The list InputPDLoop has open, for `editor_choice`: its length (0
+// when none is open) and its redraw function, which says what it lists.
+static int mcp_choice_count = 0;
+static void (*mcp_choice_refresh)() = nullptr;
+
 // 0x43671C
 static int InputPDLoop(int count, void (*refreshProc)())
 {
+    mcp_choice_count = count; // MCP
+    mcp_choice_refresh = refreshProc; // MCP
+
     text_font(101);
 
     int v3 = count - 11;
@@ -5735,6 +5755,8 @@ static int InputPDLoop(int count, void (*refreshProc)())
         renderPresent();
         sharedFpsLimiter.throttle();
     }
+
+    mcp_choice_count = 0; // MCP
 
     return rc;
 }
@@ -6219,6 +6241,81 @@ static int is_supper_bonus()
 bool editor_is_open()
 {
     return edit_win != -1;
+}
+
+// MCP: The skill the slider keys raise and lower.
+int editor_selected_skill()
+{
+    return skill_cursor;
+}
+
+// MCP: What there is to spend: unspent skill points, and whether a perk is
+// waiting to be chosen. A level-up's points and perk are only granted when
+// the character screen opens (UpdateLevel); until then this adds what that
+// will grant, without granting it.
+void editor_level_up_preview(int* skillPoints, bool* perk)
+{
+    int sp = stat_pc_get(PC_STAT_UNSPENT_SKILL_POINTS);
+    bool freePerk = free_perk != 0;
+
+    int level = stat_pc_get(PC_STAT_LEVEL);
+    if (edit_win == -1 && level != last_level && level <= PC_LEVEL_MAX) {
+        for (int nextLevel = last_level + 1; nextLevel <= level; nextLevel++) {
+            sp += 5;
+            sp += stat_get_base(obj_dude, STAT_INTELLIGENCE) * 2;
+            sp += perk_level(PERK_EDUCATED) * 2;
+            if (trait_level(TRAIT_GIFTED)) {
+                sp -= 5;
+                if (sp < 0) {
+                    sp = 0;
+                }
+            }
+            if (sp > 99) {
+                sp = 99;
+            }
+
+            if (PerkCount() < 7) {
+                int progression = 3;
+                if (trait_level(TRAIT_SKILLED)) {
+                    progression += 1;
+                }
+
+                if (nextLevel % progression == 0) {
+                    freePerk = true;
+                }
+            }
+        }
+    }
+
+    *skillPoints = sp;
+    *perk = freePerk;
+}
+
+// MCP: The list the perk dialog has open, in the order the screen shows it:
+// what it offers (an EditorChoice), the ids of its options (perks, skills or
+// traits) and which one is highlighted. Returns how many options it has, or 0
+// when no list is open.
+int editor_choice(int* kind, int* ids, int max, int* selected)
+{
+    if (mcp_choice_count == 0) {
+        return 0;
+    }
+
+    if (mcp_choice_refresh == RedrwDPrks) {
+        *kind = EDITOR_CHOICE_PERK;
+    } else if (mcp_choice_refresh == RedrwDMTagSkl) {
+        *kind = EDITOR_CHOICE_TAG_SKILL;
+    } else {
+        *kind = optrt_count == 0 ? EDITOR_CHOICE_LOSE_TRAIT : EDITOR_CHOICE_NEW_TRAIT;
+    }
+
+    int count = mcp_choice_count < max ? mcp_choice_count : max;
+    for (int index = 0; index < count; index++) {
+        ids[index] = name_sort_list[index].value;
+    }
+
+    *selected = crow + cline;
+    return count;
 }
 
 } // namespace fallout

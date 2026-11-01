@@ -27,6 +27,9 @@ function support.quiet_world()
     fo.premade = function()
         return nil
     end
+    fo.character = function()
+        return nil
+    end
     fo.awareness = function()
         return false
     end

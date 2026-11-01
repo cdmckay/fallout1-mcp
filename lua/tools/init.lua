@@ -6,4 +6,5 @@ return function(core)
     require("tools.movement")(core)
     require("tools.combat")(core)
     require("tools.inventory")(core)
+    require("tools.character")(core)
 end
