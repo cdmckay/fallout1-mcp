@@ -1,3 +1,4 @@
+local map = require("mcp.map")
 local state = require("mcp.state")
 
 -- How much `look` brightens by default: caves and night are near-black on
@@ -31,16 +32,27 @@ return function(core)
 
     core.tool({
         name = "look",
-        description = "A screenshot of the game as the player sees it, with the same state as the state tool. The image is the game's own resolution (1024x768 here), whatever the window's size. It's brightened by default, as turning up the game's brightness would, so dark caves are readable; brighten: false gives the screen as it is.",
+        description = "A screenshot of the game as the player sees it, with the same state as the state tool and, on the map, a text map: one character per hex for what's on screen, with a legend, a key to the critters' letters, and how its directions match walk_to's. The image is the game's own resolution (1024x768 here), whatever the window's size. It's brightened by default, as turning up the game's brightness would, so dark caves are readable; brighten: false gives the screen as it is, and screenshot: false leaves it out.",
         schema = core.schema({
             brighten = { type = "boolean", description = "Brighten the dark parts (default true)." },
+            screenshot = { type = "boolean", description = "Include the screenshot (default true). The state and text map come either way." },
         }),
         run = function(args)
+            local view = state.view()
+
+            local text = nil
+            if view.player ~= nil and (view.mode == "map" or view.mode == "combat") then
+                text = map.draw(view.player)
+            end
+
+            if args.screenshot == false then
+                return { data = view, text = text }
+            end
+
             local gamma = args.brighten == false and 1.0 or BRIGHT_GAMMA
             local image, width, height = fo.screenshot(gamma)
-            local view = state.view()
             view.screen = { width = width, height = height }
-            return { data = view, image = image }
+            return { data = view, text = text, image = image }
         end,
     })
 

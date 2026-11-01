@@ -16,12 +16,14 @@ add_executable(mcp_tests
     "mcp/png_test.cc"
     "mcp/scaled_clock_test.cc"
     "mcp/screens_test.cc"
+    "mcp/sight_rules_test.cc"
     "mcp/socket_server_test.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/line_buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/lua_host.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/message_log.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/png.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/screens.cc"
+    "${CMAKE_SOURCE_DIR}/src/mcp/sight_rules.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/socket_server.cc"
 )
 

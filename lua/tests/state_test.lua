@@ -230,6 +230,7 @@ local RAT = {
     name = "Rat",
     tile = 95,
     hidden = false,
+    visible = true,
     dead = false,
     hostile = true,
     hp = 4,
@@ -255,8 +256,8 @@ function tests.fair_play_shows_critters_on_screen_with_a_health_word_not_hp()
     fake_game({
         critters = {
             critter(),
-            critter({ id = 8, tile = 60 }), -- off screen
-            critter({ id = 9, tile = 96, hidden = true }), -- hidden
+            critter({ id = 8, tile = 60, visible = false }), -- off screen
+            critter({ id = 9, tile = 96, hidden = true, visible = false }), -- hidden
             critter({ id = 10, tile = 97, dead = true }), -- dead
         },
         on_screen = { [95] = { 400, 300 }, [96] = { 410, 300 }, [97] = { 420, 300 } },
@@ -273,13 +274,37 @@ function tests.fair_play_shows_critters_on_screen_with_a_health_word_not_hp()
     equal(critters[1].hostile, nil, "no hostility outside combat")
 end
 
+-- Play test 2: rats behind the cave's rock face were on screen, but not one
+-- pixel of them showed. The engine says what a player can see; fair play
+-- goes by that, not by where a critter's hex is.
+function tests.fair_play_leaves_out_critters_on_screen_that_nothing_of_shows()
+    local state = fresh_state()
+    fake_game({
+        critters = { critter(), critter({ id = 8, tile = 96, visible = false }) },
+        on_screen = { [95] = { 400, 300 }, [96] = { 608, 286 } },
+    })
+
+    local critters = state.view().critters
+
+    equal(#critters, 1, "critters listed")
+    equal(critters[1].id, 7, "the rat in sight")
+
+    state = fresh_state()
+    fake_game({
+        omniscient = true,
+        critters = { critter(), critter({ id = 8, tile = 96, visible = false }) },
+        on_screen = { [95] = { 400, 300 }, [96] = { 608, 286 } },
+    })
+    equal(#state.view().critters, 2, "omniscient mode lists both")
+end
+
 function tests.awareness_or_omniscience_shows_exact_hp()
     local state = fresh_state()
     fake_game({ awareness = true, critters = { critter() }, on_screen = { [95] = { 400, 300 } } })
     equal(state.view().critters[1].hp, 4, "hp with awareness")
 
     state = fresh_state()
-    fake_game({ omniscient = true, critters = { critter({ tile = 60 }) } })
+    fake_game({ omniscient = true, critters = { critter({ tile = 60, visible = false }) } })
     local critters = state.view().critters
     equal(#critters, 1, "off-screen critter in omniscient mode")
     equal(critters[1].max_hp, 9, "max hp in omniscient mode")

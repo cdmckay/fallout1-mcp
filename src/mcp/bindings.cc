@@ -37,6 +37,7 @@
 #include "mcp/message_log.h"
 #include "mcp/png.h"
 #include "mcp/screens.h"
+#include "mcp/sight.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
 
@@ -592,6 +593,7 @@ static int fo_critters(lua_State* L)
         set_string(L, "name", object_name(obj));
         set_int(L, "tile", obj->tile);
         set_bool(L, "hidden", (obj->flags & OBJECT_HIDDEN) != 0);
+        set_bool(L, "visible", mcp_object_visible(obj));
         set_bool(L, "dead", critter_is_dead(obj));
         set_bool(L, "knocked_down", (obj->data.critter.combat.results & DAM_KNOCKED_DOWN) != 0);
         set_bool(L, "crippled", critter_is_crippled(obj));
@@ -810,6 +812,7 @@ void mcp_register_engine_bindings(lua_State* L)
     luaL_setfuncs(L, functions, 0);
     mcp_register_inventory_bindings(L);
     mcp_register_character_bindings(L);
+    mcp_register_map_bindings(L);
 }
 
 } // namespace fallout

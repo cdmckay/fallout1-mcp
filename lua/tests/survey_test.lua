@@ -41,7 +41,7 @@ local function setup()
         return { { tile = 5000, map = -1, seen = false } }
     end
     fo.critters = function()
-        return { { id = 7, name = "Cave Rat", tile = 6000, hidden = false, dead = false, health = "Unhurt" } }
+        return { { id = 7, name = "Cave Rat", tile = 6000, hidden = false, visible = view.center == EAST, dead = false, health = "Unhurt" } }
     end
 
     require("tools.perception")(core)

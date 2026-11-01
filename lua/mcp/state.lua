@@ -4,6 +4,7 @@
 -- See "Decision views" in docs/mcp-design.md.
 
 local character = require("mcp.character")
+local sight = require("mcp.sight")
 
 local state = {}
 
@@ -128,21 +129,17 @@ function state.exits(player)
 end
 
 -- The living critters around the player, nearest first. In fair play that's
--- those drawn on screen, with health as the examine text gives it: a word, or
--- exact HP with the Awareness perk. Omniscient mode lists every critter on
--- the elevation with exact HP. In combat each also carries the player's odds
--- against it with the selected attack: the hit chance the game shows on
--- hover, and whether the attack is possible now.
+-- those a player can see on screen (mcp.sight), with health as the examine
+-- text gives it: a word, or exact HP with the Awareness perk. Omniscient mode
+-- lists every critter on the elevation with exact HP. In combat each also
+-- carries the player's odds against it with the selected attack: the hit
+-- chance the game shows on hover, and whether the attack is possible now.
 function state.critters(player, in_combat)
-    local omniscient = fo.omniscient()
-    local exact_hp = omniscient or fo.awareness()
+    local exact_hp = fo.omniscient() or fo.awareness()
     local list = {}
 
-    for _, critter in ipairs(fo.critters()) do
-        local screen = screen_point(critter.tile)
-        local visible = not critter.hidden and screen ~= nil
-
-        if not critter.dead and (visible or omniscient) then
+    for _, critter in ipairs(sight.critters()) do
+        if not critter.dead then
             local entry = {
                 id = critter.id,
                 name = critter.name,
@@ -151,7 +148,7 @@ function state.critters(player, in_combat)
                 health = critter.health,
                 knocked_down = critter.knocked_down or nil,
                 crippled = critter.crippled or nil,
-                screen = screen,
+                screen = screen_point(critter.tile),
             }
 
             if exact_hp then
