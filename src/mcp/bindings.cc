@@ -810,6 +810,7 @@ void mcp_register_engine_bindings(lua_State* L)
     luaL_setfuncs(L, functions, 0);
     mcp_register_inventory_bindings(L);
     mcp_register_character_bindings(L);
+    mcp_register_walk_bindings(L);
 }
 
 } // namespace fallout

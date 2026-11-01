@@ -1,7 +1,8 @@
 // The first slice, end to end: from Claude Code's side of the bridge, launch
 // the game, start a new game with the premade character, and get out of the
 // Vault 13 cave to the world map, fighting the rats on the way, all without
-// the mouse.
+// the mouse. Before that, a shorter case walks into the rats and checks the
+// fight starts on the player's turn with full AP.
 //
 // It drives the real bridge over stdio against the real game, so it needs a
 // built game and the game data, and runs only when asked:
@@ -69,31 +70,70 @@ afterAll(async () => {
   await client.close();
 });
 
+// Starts the game afresh and a new game with the premade character, which
+// begins in the Vault 13 cave.
+async function newGame(): Promise<View> {
+  await call("quit_game").catch(() => {});
+  const launched = await call("launch_game");
+  expect(launched).toContain("omniscient mode");
+  expect((await call("ping")).turbo).toBe(8);
+
+  // Skip the opening movies until the main menu is up.
+  let view = await call("state");
+  for (let i = 0; i < 4 && view.mode === "movie"; i++) {
+    view = await call("key", { keys: ["escape"] });
+  }
+  expect(view.mode).toBe("main_menu");
+
+  view = await call("key", { keys: ["n"] });
+  expect(view.mode).toBe("character_select");
+
+  view = await call("key", { keys: ["t"] });
+  for (let i = 0; i < 4 && view.mode === "movie"; i++) {
+    view = await call("key", { keys: ["escape"] });
+  }
+  expect(view.mode).toBe("map");
+  expect(view.player.name).toBe("Max Stone");
+  expect(view.player.map.name).toBe("Vault 13");
+  expect(view.player.hp).toBe(view.player.max_hp);
+  return view;
+}
+
+// Every walk explains itself: it arrived, or says what stopped it.
+function expectExplained(view: View) {
+  expect(view.walk).toBeDefined();
+  if (!view.walk.arrived) {
+    expect(view.walk.stopped_by).toBeDefined();
+  }
+}
+
+test.skipIf(!enabled)(
+  "walks into the cave rats and gets its turn with full AP",
+  async () => {
+    let view = await newGame();
+
+    // East along the cave, where the play test's walk ran into the rats,
+    // then straight at the nearest rat until one starts a fight.
+    view = await call("walk_to", { direction: "e", distance: 20 });
+    expectExplained(view);
+    for (let step = 0; step < 20 && view.mode !== "combat"; step++) {
+      const rat = (view.critters ?? []).find((critter: View) => critter.screen);
+      view = rat ? await call("walk_to", { x: rat.screen.x, y: rat.screen.y }) : await call("walk_to", { direction: "e", distance: 10 });
+      expectExplained(view);
+    }
+
+    expect(view.mode).toBe("combat");
+    expect(view.walk.stopped_by).toBe("a fight started");
+    expect(view.combat.your_turn).toBe(true);
+    expect(view.combat.ap).toBe(view.combat.max_ap);
+  },
+  180_000,
+);
+
 test.skipIf(!enabled)(
   "leaves the Vault 13 cave without the mouse",
   async () => {
-    const launched = await call("launch_game");
-    expect(launched).toContain("omniscient mode");
-    expect((await call("ping")).turbo).toBe(8);
-
-    // Skip the opening movies until the main menu is up.
-    let view = await call("state");
-    for (let i = 0; i < 4 && view.mode === "movie"; i++) {
-      view = await call("key", { keys: ["escape"] });
-    }
-    expect(view.mode).toBe("main_menu");
-
-    view = await call("key", { keys: ["n"] });
-    expect(view.mode).toBe("character_select");
-
-    view = await call("key", { keys: ["t"] });
-    for (let i = 0; i < 4 && view.mode === "movie"; i++) {
-      view = await call("key", { keys: ["escape"] });
-    }
-    expect(view.mode).toBe("map");
-    expect(view.player.name).toBe("Max Stone");
-    expect(view.player.map.name).toBe("Vault 13");
-    expect(view.player.hp).toBe(view.player.max_hp);
+    let view = await newGame();
 
     // Fight whatever attacks; otherwise head for the world-map exit.
     let fights = 0;
@@ -114,6 +154,7 @@ test.skipIf(!enabled)(
       const exit = (view.exits ?? []).find((candidate: View) => candidate.to === "the world map");
       expect(exit).toBeDefined();
       view = await call("walk_to", { tile: exit.tile, run: true });
+      expectExplained(view);
     }
 
     expect(view.mode).toBe("world_map");
