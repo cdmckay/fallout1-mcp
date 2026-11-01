@@ -8,4 +8,5 @@ return function(core)
     require("tools.inventory")(core)
     require("tools.character")(core)
     require("tools.worldmap")(core)
+    require("tools.objects")(core)
 end

@@ -4,6 +4,7 @@
 -- See "Decision views" in docs/mcp-design.md.
 
 local character = require("mcp.character")
+local objects = require("mcp.objects")
 local sight = require("mcp.sight")
 local worldmap = require("mcp.worldmap")
 
@@ -37,10 +38,10 @@ local HINTS = {
     town_map = "Town map; `town_map.places` lists where you can go in. enter takes one by name. press 512 goes to the world map (travel does too).",
     dialog = "In conversation. Keys 1 to 9 choose a reply.",
     combat = "In combat. attack a critter by id, or end_turn to pass. Keys: n cycles the attack mode, b swaps hands.",
-    map = "Exploring the map.",
+    map = "Exploring the map. objects lists what you can pick_up, loot or use; look_at describes anything.",
     inventory = "Inventory screen. You don't need it: the inventory, equip, unequip, reload and use_item tools work from the map. Escape closes it.",
     use_item_on = "Choosing an item to use on something; this still needs the mouse. Escape cancels.",
-    loot = "Looting. Keys: A (capital) takes everything, escape closes. Taking single items isn't supported yet.",
+    loot = "Looting; `loot` below is what's there. take moves items to you by id, or everything with all: true; its close (or escape) leaves.",
     barter = "Bartering. Keys: m offers the deal on the table, t goes back to talking, escape leaves. Putting items on the table isn't supported yet.",
     pipboy = "Pip-Boy. Escape closes it. press codes: 500 status, 501 automaps, 502 archives, 504 alarm clock (to rest).",
     options = "Options. Keys: s save, l load, p preferences, d or escape done, e quit to the main menu.",
@@ -55,6 +56,10 @@ local HINTS = {
 }
 
 local DIRECTION_NAMES = { [0] = "ne", "e", "se", "sw", "w", "nw" }
+
+-- How many objects the view lists, nearest first; the objects tool has the
+-- rest.
+local OBJECTS_SHOWN = 12
 
 local function by_distance(a, b)
     return a.distance < b.distance
@@ -148,6 +153,7 @@ function state.critters(player, in_combat)
                 distance = fo.tile_distance(player.tile, critter.tile),
                 direction = DIRECTION_NAMES[fo.tile_direction(player.tile, critter.tile)],
                 health = critter.health,
+                can_talk = (not in_combat and critter.can_talk) or nil,
                 knocked_down = critter.knocked_down or nil,
                 crippled = critter.crippled or nil,
                 screen = screen_point(critter.tile),
@@ -305,7 +311,12 @@ function state.view()
     if player ~= nil and (mode == "map" or mode == "combat") then
         view.equipped = fo.equipped()
         view.critters = state.critters(player, mode == "combat")
+        view.objects, view.objects_left_out = objects.nearest(player, OBJECTS_SHOWN)
         view.exits = state.exits(player)
+    end
+
+    if mode == "loot" then
+        view.loot = objects.loot_view()
     end
 
     local messages = state.new_messages()

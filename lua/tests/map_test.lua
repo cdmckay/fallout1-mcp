@@ -125,6 +125,14 @@ local function fake_cave(options)
             rat(711, -2, 2, { dead = true }),
         }
     end
+    -- The dead rat is a body, and the items lie on the floor.
+    fo.objects = function()
+        return {
+            { id = 711, name = "Cave Rat", kind = "body", tile = tile(-2, 2), visible = true },
+            { id = 801, name = "Rock", kind = "item", type = "misc", tile = tile(-6, 2), visible = true },
+            { id = 802, name = "Rock", kind = "item", type = "misc", tile = tile(4, 4), visible = false },
+        }
+    end
     fo.tile_distance = hex_distance
     fo.screenshot = function()
         return "PNG", 1024, 768
@@ -230,6 +238,22 @@ function tests.the_map_and_critter_list_agree_on_who_is_in_sight()
     end
     equal(listed[469], nil, "the hidden rat isn't listed")
     equal(#view.critters, 3, "living rats in sight")
+end
+
+function tests.containers_and_things_to_use_get_marks_of_their_own()
+    local _, engine = fake_cave()
+    local cave_objects = fo.objects
+    fo.objects = function()
+        local list = cave_objects()
+        list[#list + 1] = { id = 271, name = "Bones", kind = "container", tile = tile(2, 0), visible = true, open = false, locked = false }
+        list[#list + 1] = { id = 240, name = "Door Entry Computer", kind = "scenery", tile = tile(-2, 0), visible = true }
+        return list
+    end
+
+    local text = look(engine)[2].text
+
+    contains(drawn(text), "! @ =", "the computer west of the player and the bones east")
+    contains(text, "= container, ! something to use", "the legend")
 end
 
 local function count(text, char)

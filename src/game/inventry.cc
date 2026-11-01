@@ -215,6 +215,7 @@ static void display_table_inventories(int win, Object* a2, Object* a3, int a4);
 static int do_move_timer(int inventoryWindowType, Object* item, int a3);
 static int setup_move_timer_win(int inventoryWindowType, Object* item);
 static int exit_move_timer_win(int inventoryWindowType);
+static int mcp_take_item(); // MCP
 
 // The number of items to show in scroller.
 //
@@ -253,6 +254,9 @@ static CacheEntry* mt_key[8];
 
 // 0x59CD4C
 CacheEntry* ikey[OFF_59E7BC_COUNT];
+
+// MCP: What the agent's INVEN_TAKE_ITEM_CODE asks the loot screen to take.
+InvenTakeRequest inven_take_request;
 
 // 0x59CD9C
 static int target_stack_offset[10];
@@ -3896,6 +3900,12 @@ int loot_container(Object* a1, Object* a2)
                 display_target_inventory(target_stack_offset[target_curr_stack], -1, target_pud, INVENTORY_WINDOW_TYPE_LOOT);
                 win_draw(i_wid);
             }
+        } else if (keyCode == INVEN_TAKE_ITEM_CODE) {
+            // MCP: Takes an item without the mouse, then redraws both sides
+            // as a drag does.
+            inven_take_request.result = mcp_take_item();
+            display_target_inventory(target_stack_offset[target_curr_stack], -1, target_pud, INVENTORY_WINDOW_TYPE_LOOT);
+            display_inventory(stack_offset[curr_stack], -1, INVENTORY_WINDOW_TYPE_LOOT);
         } else if (keyCode >= 2500 && keyCode <= 2501) {
             container_exit(keyCode, INVENTORY_WINDOW_TYPE_LOOT);
         } else {
@@ -5412,6 +5422,61 @@ int inven_set_timer(Object* a1)
 int inven_open_screen()
 {
     return inven_open_type;
+}
+
+// MCP: What the loot screen shows on the other side: the body or container
+// being looted, or a bag opened inside it. Null when no loot screen is open.
+Object* inven_loot_target()
+{
+    if (inven_open_type != INVENTORY_WINDOW_TYPE_LOOT) {
+        return NULL;
+    }
+
+    return target_stack[target_curr_stack];
+}
+
+// MCP: Takes `inven_take_request`'s item from the other side of the loot
+// screen, as dropping it on the player's side does in `move_inventory`, but
+// with no drag and no quantity dialog. A quantity of 0 or less takes the
+// whole stack.
+static int mcp_take_item()
+{
+    if (gIsSteal) {
+        return INVEN_TAKE_STEALING;
+    }
+
+    Object* container = target_stack[target_curr_stack];
+    for (int index = 0; index < target_pud->length; index++) {
+        InventoryItem* inventoryItem = &(target_pud->items[index]);
+        Object* item = inventoryItem->item;
+        if (item->id != inven_take_request.itemId) {
+            continue;
+        }
+
+        int quantity = inventoryItem->quantity;
+        if (inven_take_request.quantity > 0) {
+            quantity = std::min(inven_take_request.quantity, quantity);
+        }
+
+        if (item_move(container, inven_dude, item, quantity) != 0) {
+            // You cannot pick that up. You are at your maximum weight capacity.
+            MessageListItem messageListItem;
+            messageListItem.num = 25;
+            if (message_search(&inventry_message_file, &messageListItem)) {
+                display_print(messageListItem.text);
+            }
+            return INVEN_TAKE_TOO_HEAVY;
+        }
+
+        if ((item->flags & OBJECT_IN_RIGHT_HAND) != 0) {
+            container->fid = art_id(FID_TYPE(container->fid), container->fid & 0xFFF, FID_ANIM_TYPE(container->fid), 0, container->rotation + 1);
+        }
+
+        container->flags &= ~OBJECT_EQUIPPED;
+        return INVEN_TAKE_DONE;
+    }
+
+    return INVEN_TAKE_NOT_THERE;
 }
 
 } // namespace fallout

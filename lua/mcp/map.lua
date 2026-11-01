@@ -15,14 +15,19 @@
 -- art the player can't get onto, and the corridors stand out between their
 -- walls.
 
+local objects = require("mcp.objects")
 local sight = require("mcp.sight")
 
 local map = {}
 
-map.LEGEND = "Text map of what's on screen, one character per hex: @ you, a-z critters (key below), # wall or rock face, + door, . floor you can walk to, > exit, * item, % body. Blank is out of sight or out of reach."
+map.LEGEND = "Text map of what's on screen, one character per hex: @ you, a-z critters (key below), # wall or rock face, + door, . floor you can walk to, > exit, * item, % body, = container, ! something to use (objects lists them all). Blank is out of sight or out of reach."
 map.DIRECTIONS = "Directions as walk_to takes them: up is n. One hex e or w is 2 characters along the line; ne, se, sw and nw are 1 line up or down and 1 character across; n and s are 1 line straight up or down."
 
 local LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+-- Which object's mark shows when several share a hex. Doors are drawn with
+-- the walls, where they border floor.
+local RANK = { item = 1, scenery = 2, container = 3, body = 4 }
 
 -- A hex's neighbours, in map columns and rows: e and w along the row, the
 -- other four a row up or down and half a hex across.
@@ -83,22 +88,27 @@ function map.draw(player)
         return false
     end
 
-    -- Living critters get letters, nearest first as the critter list has
-    -- them; the dead are bodies.
-    local living = {}
+    -- Objects get their kind's mark, as the objects list has them, and the
+    -- living get letters, nearest first as the critter list has them.
     local marks = {}
+    local ranks = {}
+    for _, object in ipairs(objects.list(player)) do
+        local rank = RANK[object.kind]
+        if rank ~= nil and on_map[object.tile] and rank > (ranks[object.tile] or 0) then
+            marks[object.tile] = objects.SYMBOLS[object.kind]
+            ranks[object.tile] = rank
+        end
+    end
+
+    local living = {}
     for _, critter in ipairs(sight.critters()) do
-        if on_map[critter.tile] and critter.tile ~= player.tile then
-            if critter.dead then
-                marks[critter.tile] = marks[critter.tile] or "%"
-            else
-                living[#living + 1] = {
-                    id = critter.id,
-                    name = critter.name,
-                    tile = critter.tile,
-                    distance = fo.tile_distance(player.tile, critter.tile),
-                }
-            end
+        if on_map[critter.tile] and critter.tile ~= player.tile and not critter.dead then
+            living[#living + 1] = {
+                id = critter.id,
+                name = critter.name,
+                tile = critter.tile,
+                distance = fo.tile_distance(player.tile, critter.tile),
+            }
         end
     end
     table.sort(living, by_distance)

@@ -6,11 +6,17 @@ local json = require("lib.dkjson")
 local support = {}
 
 -- Fills in the state view's bindings with an empty world: no critters, no
--- exits, no messages, no fight, nothing on screen. Tests override what they
--- need on top.
+-- objects, no exits, no messages, no fight, nothing on screen. Tests
+-- override what they need on top.
 function support.quiet_world()
     fo.critters = function()
         return {}
+    end
+    fo.objects = function()
+        return {}
+    end
+    fo.loot_screen = function()
+        return nil
     end
     fo.exits = function()
         return {}

@@ -1,4 +1,5 @@
 local map = require("mcp.map")
+local objects = require("mcp.objects")
 local state = require("mcp.state")
 
 -- How much `look` brightens by default: caves and night are near-black on
@@ -24,7 +25,7 @@ local SURVEY_SPOTS = {
 return function(core)
     core.tool({
         name = "state",
-        description = "What's happening now: which screen is up (mode), the keys that work there (hint), and, during a game, your character's HP, level, position, map and the date, the critters and exits you know of, what you're holding, and the message window's new lines.",
+        description = "What's happening now: which screen is up (mode), the keys that work there (hint), and, during a game, your character's HP, level, position, map and the date, the critters, objects and exits you know of, what you're holding, and the message window's new lines. On the loot screen, what's there to take.",
         run = function()
             return { data = state.view() }
         end,
@@ -58,7 +59,7 @@ return function(core)
 
     core.tool({
         name = "survey",
-        description = "Looks around without moving, as a player scrolls the view: in eight directions, about 14 hexes out, within the limits the game puts on scrolling. Exits seen are remembered and listed from then on. Returns the state view, plus `spotted`: the critters seen while looking, with distance and direction.",
+        description = "Looks around without moving, as a player scrolls the view: in eight directions, about 14 hexes out, within the limits the game puts on scrolling. Exits seen are remembered and listed from then on. Returns the state view, plus `spotted`: the critters seen while looking, with distance and direction, and `spotted_objects`: the items, bodies, containers, doors and things to use seen, as objects lists them.",
         run = function()
             local player = fo.player()
             local mode = state.mode(fo.flags())
@@ -69,6 +70,7 @@ return function(core)
             local origin = fo.view_center()
             local looked = {}
             local spotted = {}
+            local spotted_objects = {}
 
             for _, spot in ipairs(SURVEY_SPOTS) do
                 local tile = player.tile
@@ -83,6 +85,9 @@ return function(core)
                     state.see_exits(player)
                     for _, critter in ipairs(state.critters(player, false)) do
                         spotted[critter.id] = critter
+                    end
+                    for _, object in ipairs(objects.list(player)) do
+                        spotted_objects[object.id] = object
                     end
                 end
             end
@@ -99,6 +104,19 @@ return function(core)
                 return a.distance < b.distance
             end)
             view.spotted = list
+
+            local seen_objects = {}
+            for _, object in pairs(spotted_objects) do
+                object.screen = nil
+                seen_objects[#seen_objects + 1] = object
+            end
+            table.sort(seen_objects, function(a, b)
+                if a.distance ~= b.distance then
+                    return a.distance < b.distance
+                end
+                return a.id < b.id
+            end)
+            view.spotted_objects = seen_objects
             view.survey = { looked = looked }
             return { data = view }
         end,

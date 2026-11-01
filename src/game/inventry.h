@@ -44,7 +44,31 @@ typedef enum InventoryWindowType {
     INVENTORY_WINDOW_TYPE_COUNT,
 } InventoryWindowType;
 
+// MCP: An event code the agent injects into the loot screen to take an item
+// from the other side without dragging it. `inven_take_request` says which
+// and how many, and the loop moves it as dropping it on the player's side
+// does (`move_inventory`).
+#define INVEN_TAKE_ITEM_CODE 0x7300
+
+// MCP: How an INVEN_TAKE_ITEM_CODE went.
+typedef enum InvenTakeResult {
+    INVEN_TAKE_PENDING, // not handled yet
+    INVEN_TAKE_DONE,
+    INVEN_TAKE_NOT_THERE, // no such item on the other side
+    INVEN_TAKE_TOO_HEAVY, // more than the player can carry
+    INVEN_TAKE_STEALING, // stealing goes through the Steal skill's checks
+} InvenTakeResult;
+
+// MCP: What INVEN_TAKE_ITEM_CODE takes: an item's id and how many of its
+// stack. The loot screen sets `result`.
+typedef struct InvenTakeRequest {
+    int itemId;
+    int quantity;
+    int result;
+} InvenTakeRequest;
+
 extern CacheEntry* ikey[OFF_59E7BC_COUNT];
+extern InvenTakeRequest inven_take_request; // MCP
 
 void inven_set_dude(Object* obj, int pid);
 void inven_reset_dude();
@@ -77,6 +101,7 @@ Object* inven_index_ptr(Object* obj, int a2);
 int inven_wield(Object* critter, Object* item, int a3);
 int inven_unwield(Object* critter, int a2);
 int inven_open_screen(); // MCP
+Object* inven_loot_target(); // MCP
 int inven_from_button(int input, Object** a2, Object*** a3, Object** a4);
 void inven_display_msg(char* string);
 void inven_obj_examine_func(Object* critter, Object* item);

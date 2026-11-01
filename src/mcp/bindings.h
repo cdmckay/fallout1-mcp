@@ -32,6 +32,10 @@ void mcp_register_walk_bindings(lua_State* L);
 // The world map bindings (bindings_worldmap.cc), added to the same table.
 void mcp_register_worldmap_bindings(lua_State* L);
 
+// The bindings for objects on the map (bindings_objects.cc), added to the
+// same table.
+void mcp_register_object_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

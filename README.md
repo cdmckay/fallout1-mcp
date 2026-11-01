@@ -12,10 +12,11 @@ An agent can:
 - start a new game with a premade character;
 - equip weapons, reload them and use stimpaks;
 - read its character sheet, and spend a level-up's skill points and perk;
+- pick things up, loot bodies and containers, and open doors;
 - fight its way through the Vault 13 cave;
 - travel the world map, and go into the places it knows.
 
-It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking and picking things up.
+It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, and talking.
 
 | Area | Tools |
 | --- | --- |
@@ -23,6 +24,7 @@ It does all of this without the mouse. Each play test turns what tripped the age
 | Seeing | `state` (the current screen, its keys, and what's going on), `look` (the same, plus a screenshot and a text map of what's on screen), `survey` (looks around without moving) |
 | Input | `key` (keys, as the player presses them), `press` (on-screen buttons that have no key) |
 | Moving | `walk_to` (a tile, a point on the screenshot or a direction) |
+| Objects | `objects` (what's on the map besides the living), `pick_up`, `loot` and `take`, `use` (doors and other things), `look_at` |
 | Combat | `attack`, `end_turn` |
 | Inventory | `inventory`, `equip`, `unequip`, `reload`, `use_item` |
 | Character | `character` (the character sheet), `raise_skill`, `choose_perk` |
