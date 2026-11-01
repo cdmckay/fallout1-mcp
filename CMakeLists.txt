@@ -22,6 +22,7 @@ set(CMAKE_CXX_EXTENSIONS NO)
 
 option(ASAN "Enable address sanitizer" OFF)
 option(UBSAN "Enable undefined behaviour sanitizer" OFF)
+option(FALLOUT_MCP_TESTS "Build the MCP unit tests and run them with ctest" OFF)
 
 if (ANDROID)
     add_library(${EXECUTABLE_NAME} SHARED)
@@ -272,6 +273,19 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/plib/gnw/touch.h"
 )
 
+target_sources(${EXECUTABLE_NAME} PUBLIC
+    "src/mcp/bindings.cc"
+    "src/mcp/bindings.h"
+    "src/mcp/line_buffer.cc"
+    "src/mcp/line_buffer.h"
+    "src/mcp/lua_host.cc"
+    "src/mcp/lua_host.h"
+    "src/mcp/mcp.cc"
+    "src/mcp/mcp.h"
+    "src/mcp/socket_server.cc"
+    "src/mcp/socket_server.h"
+)
+
 if(IOS)
     target_sources(${EXECUTABLE_NAME} PUBLIC
         "src/platform/ios/paths.h"
@@ -356,6 +370,14 @@ target_link_libraries(${EXECUTABLE_NAME} adecode::adecode)
 
 add_subdirectory("third_party/fpattern")
 target_link_libraries(${EXECUTABLE_NAME} fpattern::fpattern)
+
+add_subdirectory("third_party/lua")
+target_link_libraries(${EXECUTABLE_NAME} lua::lua)
+
+if(FALLOUT_MCP_TESTS)
+    enable_testing()
+    add_subdirectory("tests")
+endif()
 
 target_link_libraries(${EXECUTABLE_NAME} ${SDL2_LIBRARIES})
 target_include_directories(${EXECUTABLE_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})

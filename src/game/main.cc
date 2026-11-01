@@ -36,6 +36,7 @@
 #include "game/selfrun.h"
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
+#include "mcp/mcp.h"
 #include "plib/color/color.h"
 #include "plib/gnw/debug.h"
 #include "plib/gnw/gnw.h"
@@ -230,6 +231,10 @@ static bool main_init_system(int argc, char** argv)
     // NOTE: Uninline.
     main_selfrun_init();
 
+    // MCP: Off unless FALLOUT_MCP_SOCKET is set. If it fails to start, the
+    // game plays on without it.
+    mcp_init();
+
     return true;
 }
 
@@ -248,6 +253,9 @@ static void main_exit_system()
 
     // NOTE: Uninline.
     main_selfrun_exit();
+
+    // MCP
+    mcp_exit();
 
     game_exit();
 

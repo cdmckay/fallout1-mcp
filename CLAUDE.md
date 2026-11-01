@@ -12,11 +12,36 @@ A fork of [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce
 The devShell (`flake.nix`, loaded by direnv) provides CMake, SDL2 and git:
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFALLOUT_MCP_TESTS=ON
 cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
-The first configure downloads `fpattern` and `adecode` (and SDL2 on macOS) with CMake's FetchContent, so it needs network. On Linux it links the system SDL2, which on nixos-26.05 is `sdl2-compat` running on SDL3. The binary is `build/fallout-ce`.
+The first configure downloads `fpattern`, `adecode`, Lua 5.5.1 (and SDL2 on macOS), plus Catch2 when tests are on, with CMake's FetchContent, so it needs network. Lua and Catch2 come as release tarballs pinned by SHA-256. On Linux it links the system SDL2, which on nixos-26.05 is `sdl2-compat` running on SDL3. The binary is `build/fallout-ce`.
+
+`FALLOUT_MCP_TESTS` builds two kinds of test:
+
+- **C++ (Catch2):** `tests/mcp/`. These test the MCP pieces that don't need the engine (socket, line framing, Lua host) and run the real `lua/` scripts against fake bindings.
+- **Lua:** `lua/tests/`, with a fake `fo` table. They run under `build/third_party/lua/lua`, an interpreter built from the same Lua sources the game embeds:
+
+  ```bash
+  build/third_party/lua/lua lua/tests/run.lua
+  ```
+
+## MCP
+
+The design is in `docs/mcp-design.md`. In short:
+
+- `src/mcp/` is the engine side: socket, Lua host and `fo` bindings. It runs from `mcp_tick()` at the top of `process_bk()`.
+- `lua/` is everything else. `main.lua` is the entry point, `mcp/core.lua` holds the protocol and scheduler, and `tools/` holds one file per area, each listed in `tools/init.lua`.
+
+MCP is off unless the game starts with these set:
+
+- `FALLOUT_MCP_SOCKET`: where the game listens, e.g. `$XDG_RUNTIME_DIR/fallout1-mcp/game.sock`, in a 0700 directory.
+- `FALLOUT_MCP_LUA`: the repo's `lua/` directory.
+- `FALLOUT_MCP_OMNISCIENT=1`: optional, for omniscient mode.
+
+The protocol is one JSON object per line, each answered once by id. `{"id":1,"op":"list"}` lists the tools, `{"id":2,"op":"call","tool":"ping","args":{}}` calls one, and `{"id":3,"op":"reload"}` reruns the Lua files in the live game. A reload doesn't need a rebuild or a restart, but it does reset Lua's state.
 
 ## Game data
 
@@ -38,11 +63,14 @@ The engine rewrites `fallout.cfg` when it exits.
 cd ~/.local/share/fallout1-mcp && ~/Code/fallout1-mcp/build/fallout-ce
 ```
 
-From a Claude Desktop session on mango, launch it as a transient user unit with the sandbox off. It then runs in the GNOME session like any app, rather than inside the session's bubblewrap:
+From a Claude Desktop session on mango, launch it as a transient user unit with the sandbox off. It then runs in the GNOME session like any app, rather than inside the session's bubblewrap. This launch also turns MCP on:
 
 ```bash
+mkdir -p -m 700 /run/user/1000/fallout1-mcp
 systemd-run --user --unit=fallout1-mcp --collect \
   --working-directory=/home/cdmckay/.local/share/fallout1-mcp \
+  --setenv=FALLOUT_MCP_SOCKET=/run/user/1000/fallout1-mcp/game.sock \
+  --setenv=FALLOUT_MCP_LUA=/home/cdmckay/Code/fallout1-mcp/lua \
   -- /home/cdmckay/Code/fallout1-mcp/build/fallout-ce
 ```
 

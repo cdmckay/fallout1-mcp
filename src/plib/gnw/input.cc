@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "audio_engine.h"
+#include "mcp/mcp.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
@@ -214,6 +215,10 @@ void get_input_position(int* x, int* y)
 void process_bk()
 {
     int v1;
+
+    // MCP: Every interactive screen's loop comes through here, so this is
+    // where agent commands run.
+    mcp_tick();
 
     GNW_do_bk_process();
 
@@ -1127,8 +1132,12 @@ void GNW95_process_message()
                 audioEngineResume();
                 break;
             case SDL_WINDOWEVENT_FOCUS_LOST:
-                GNW95_isActive = false;
-                audioEnginePause();
+                // MCP: An agent plays while its window is in the background,
+                // so the game must not freeze in `GNW95_lost_focus`.
+                if (!mcp_is_enabled()) {
+                    GNW95_isActive = false;
+                    audioEnginePause();
+                }
                 break;
             }
             break;

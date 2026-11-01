@@ -45,7 +45,7 @@ Gaps to close:
 
 Almost every action is asynchronous. Walking queues an animation, talking requests a dialog that opens on a later frame, and a combat turn passes through NPC turns. Each request runs as a Lua coroutine. `process_bk` resumes the live coroutine once per frame, and tool code waits with plain calls such as `wait.frames(2)` or `wait.until(idle, 10)`. This keeps "walk there, wait until arrived, return what changed" as straight-line code, without blocking the game. It's also the main reason to put Lua in at all.
 
-Requests are handled one at a time. If a request arrives while a coroutine is still running, it is rejected as busy rather than queued.
+Requests are handled one at a time. If a request arrives while a coroutine is still running, it is rejected as busy rather than queued. The bridge queues the agent's calls, so the agent never sees "busy".
 
 ### The agent never uses the mouse
 
@@ -91,7 +91,7 @@ MCP is off unless `FALLOUT_MCP_SOCKET=<path>` is set; normal play is unchanged. 
 
 ## Lua side
 
-- `lua/mcp.lua`: protocol handling, a tool registry, the coroutine scheduler and the `wait` helpers.
+- `lua/main.lua`, the entry point, and `lua/mcp/core.lua`: protocol handling, a tool registry, the coroutine scheduler, and the `wait_*`, `defer` and `post` helpers.
 - `lua/tools/*.lua`: one file per area (perception, input, movement, dialog, combat, inventory, world map, save/load). A tool is a table with `name`, `description`, `schema` and `run(args)`.
 - `reload` re-runs every file. The bridge then sends `notifications/tools/list_changed`, so new tools appear without restarting anything.
 

@@ -10,6 +10,7 @@
 #include "game/options.h"
 #include "game/palette.h"
 #include "game/version.h"
+#include "mcp/mcp.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/gnw.h"
@@ -377,7 +378,9 @@ int main_menu_loop()
         } else if (game_user_wants_to_quit == 2) {
             game_user_wants_to_quit = 0;
         } else {
-            if (elapsed_time(tick) >= main_menu_timeout) {
+            // MCP: An agent may sit on the menu for a while; don't start the
+            // intro under it.
+            if (elapsed_time(tick) >= main_menu_timeout && !mcp_is_enabled()) {
                 rc = MAIN_MENU_TIMEOUT;
             }
         }
