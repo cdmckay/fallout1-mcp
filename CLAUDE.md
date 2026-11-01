@@ -128,6 +128,10 @@ On mango's btrfs the reflink copy is instant and takes no extra space. It also k
 
 The plain `fallout1-mcp` unit and data directory belong to Cameron and the play tests. Never stop or reuse them from a worktree.
 
+## Working in parallel
+
+Several Claude Code sessions can work at once, each in its own worktree with its own game (see "Several games at once"). One coordinating session splits the open issues so the sessions don't edit the same code, starts a session per piece, and merges each PR once it's clean against `main` and its tests pass. Cameron doesn't need to approve merges here (2026-11-01): nothing deploys from this repository. The coordinator then rebuilds `main`, runs every test including the e2e ones, and runs a play test ([docs/play-test.md](docs/play-test.md)). Work that's stopped partway goes up as a draft PR, with a note on its issue saying where it stands.
+
 ## Changes from upstream
 
 Comments starting `// CE:` mark where upstream departs from the original game. This fork uses the same marker for its own changes:
