@@ -110,7 +110,7 @@ Every action tool waits until the game is idle (with a timeout) and then returns
 | Keys | `key(name)` | `GNW_add_input_buffer`, `kb_simulate_key` |
 | Raw mouse (omniscient only) | `click(x, y, button)`, `move_mouse(x, y)` | virtual pointer |
 | Movement | `walk_to(tile, screen point, or direction and distance; run)`; a short walk says why in `stopped_by`, and one a fight stops returns on the player's turn | `register_begin` / `register_object_move_to_tile` / `register_end`, as `gmouse_handle_event` does; in combat, AP is passed and spent per step. A direction walk picks its spot from a breadth-first search over `obj_blocking_at` (`src/mcp/bindings_walk.cc`) |
-| Interaction | `use`, `pick_up`, `look_at`, `use_skill`, `use_item_on`, `loot` | `action_use_an_object`, `action_get_an_object`, `action_use_skill_on`, `action_use_an_item_on_object`, `action_loot_container` |
+| Interaction | `objects`, `pick_up`, `loot` and `take`, `use`, `look_at` (built); `use_skill`, `use_item_on` | `action_get_an_object`, `action_loot_container`, `action_use_an_object`, `obj_examine` (`src/mcp/bindings_objects.cc`); the loot screen's `A` key and `INVEN_TAKE_ITEM_CODE`; `action_use_skill_on`, `action_use_an_item_on_object` |
 | Dialog | `talk(npc)`, `choose(n)`, `barter(...)` | `action_talk_to`; option keys `'1'`–`'9'` (`gdialog.cc:1374`); `'b'` and `'m'` for barter |
 | Combat | `attack(target; repeat, end_turn, min_hp)`, which fights a target to the death across turns and says in `stopped_by` what stopped it short; `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack`, `determine_to_hit`, Space and Return |
 | World map | `travel(place or point)`, `enter(place)` | town buttons `500 + town`, town-map places `514 +`, and command codes for a point and the player's marker |
@@ -177,6 +177,13 @@ This view comes back from every combat action, and from `state` during combat.
 
   Each entry has its id, its distance in hexes and the actions that apply to it: talk, use, pick up, loot, or a skill.
 
+Built (#14): `objects` in the view lists the nearest dozen things a player can see besides the living, and the `objects` tool lists them all. Each has a `kind`, with the tool that acts on it, as a click on it does (`gmouse.cc:904-950`):
+- `item`, on the ground: `pick_up`;
+- `body` and `container`: `loot`, then `take`;
+- `door` and `scenery` that can be used: `use`.
+
+The text map marks each kind with the legend's symbol: `*`, `%`, `=`, `+` and `!`. Doors and containers say whether they're open. A lock can't be seen, so fair play says `locked` only once the player has tried it; omniscient mode always says. Every action walks up first, through the game's own action, so it runs when far off and costs AP in combat. Critters carry `can_talk` out of combat, from `obj_action_can_talk_to`, which is every living critter; `talk` waits for dialog.
+
 ### Other screens
 
 - **Dialog:** the NPC's name, its whole reply (unpaged), the numbered options, and whether barter is available.
@@ -235,7 +242,7 @@ What follows is everything that needs the mouse today, and how each will get a m
 
 **Map view: semantic tools, route 2.** These are the core of play:
 - walking: `walk_to`, built;
-- the primary action on an object: `use`, `pick_up` or `talk`, as `gmouse.cc:904-950` dispatches it;
+- the primary action on an object: `use`, `pick_up` or `talk`, as `gmouse.cc:904-950` dispatches it. Built except `talk`, with `loot` for bodies and containers;
 - the hold-click action menu: each outcome as its own tool;
 - attacking: `attack`, built;
 - using an item on an object: `action_use_an_item_on_object`;
@@ -248,7 +255,7 @@ What follows is everything that needs the mouse today, and how each will get a m
 
 **Use-item-on, loot and barter: command codes, route 3.**
 - **Picking the item for use-on:** `inventry.cc:2357-2361`.
-- **Loot and steal.** Moving one item either way goes through `move_inventory` → `item_move` (`:3910`, `:3934`), quantity included. When stealing, `gStealCount`, `gStealSize` and the stealing XP locals must stay in step.
+- **Loot and steal.** Moving one item either way goes through `move_inventory` → `item_move` (`:3910`, `:3934`), quantity included. When stealing, `gStealCount`, `gStealSize` and the stealing XP locals must stay in step. Built for taking while looting: `INVEN_TAKE_ITEM_CODE` (`0x7300`) moves the item `inven_take_request` names, as dropping it on the player's side does, and `take` uses it. The `A` key takes everything. Putting items back and stealing are still to come.
 - **Barter.** Each of the four table moves is `item_move_force` between the inventories and `ptable`/`btable` (`:4738-4786`), followed by redrawing both tables.
 
 **World map: command codes inside `world_map`, route 3.**

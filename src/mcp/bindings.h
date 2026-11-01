@@ -37,6 +37,10 @@ void mcp_register_worldmap_bindings(lua_State* L);
 // critter's attack (bindings_combat.cc).
 void mcp_set_message_attacker(lua_State* L, long long seq);
 
+// The bindings for objects on the map (bindings_objects.cc), added to the
+// same table.
+void mcp_register_object_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

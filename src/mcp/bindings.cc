@@ -603,6 +603,7 @@ static int fo_critters(lua_State* L)
         set_bool(L, "crippled", critter_is_crippled(obj));
         set_bool(L, "hostile", mcp_critter_hostile(obj));
         set_bool(L, "fighting", combat_is_combatant(obj));
+        set_bool(L, "can_talk", obj_action_can_talk_to(obj));
         set_int(L, "hp", stat_level(obj, STAT_CURRENT_HIT_POINTS));
         set_int(L, "max_hp", stat_level(obj, STAT_MAXIMUM_HIT_POINTS));
         set_string(L, "health", health_description(obj));
@@ -820,6 +821,7 @@ void mcp_register_engine_bindings(lua_State* L)
     mcp_register_map_bindings(L);
     mcp_register_walk_bindings(L);
     mcp_register_worldmap_bindings(L);
+    mcp_register_object_bindings(L);
 }
 
 } // namespace fallout
