@@ -23,7 +23,7 @@ It does all of this without the mouse. Each play test turns what tripped the age
 | Seeing | `state` (the current screen, its keys, and what's going on), `look` (the same, plus a screenshot and a text map of what's on screen), `survey` (looks around without moving) |
 | Input | `key` (keys, as the player presses them), `press` (on-screen buttons that have no key) |
 | Moving | `walk_to` (a tile, a point on the screenshot or a direction) |
-| Combat | `attack`, `end_turn` |
+| Combat | `attack` (keeps at a critter until it dies, ending turns as needed, and says what stopped it if it didn't), `end_turn` |
 | Inventory | `inventory`, `equip`, `unequip`, `reload`, `use_item` |
 | Character | `character` (the character sheet), `raise_skill`, `choose_perk` |
 | World map | `travel` (to a place the map knows, or a point), `enter` (the place you're at) |

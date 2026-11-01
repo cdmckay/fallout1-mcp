@@ -282,7 +282,24 @@ function tests.fair_play_shows_critters_on_screen_with_a_health_word_not_hp()
     equal(critters[1].hp, nil, "exact hp")
     equal(critters[1].distance, 5, "distance")
     equal(critters[1].hit_chance, nil, "no odds outside combat")
-    equal(critters[1].hostile, nil, "no hostility outside combat")
+end
+
+-- Play test 2: a rat sat three hexes away, peaceful, then attacked on the
+-- player's next move. The list says before any fight who will attack.
+function tests.critters_say_whether_they_will_attack_outside_combat_too()
+    local state = fresh_state()
+    fake_game({
+        critters = { critter(), critter({ id = 8, name = "Aradesh", tile = 96, hostile = false }) },
+        on_screen = { [95] = { 400, 300 }, [96] = { 410, 300 } },
+    })
+
+    local hostile = {}
+    for _, critter in ipairs(state.view().critters) do
+        hostile[critter.id] = critter.hostile
+    end
+
+    equal(hostile[7], true, "the rat")
+    equal(hostile[8], false, "Aradesh")
 end
 
 -- Play test 2: rats behind the cave's rock face were on screen, but not one
@@ -355,6 +372,31 @@ function tests.combat_shows_the_turn_the_attack_and_the_odds_against_each_critte
     equal(view.critters[2].hostile, true, "hostile")
 end
 
+-- Play test 2: every far rat read 48 or 49 percent, a figure that means
+-- nothing while the rat is out of range.
+function tests.a_critter_out_of_range_has_no_hit_chance()
+    local state = fresh_state()
+    fake_game({
+        flags = { in_game = true, combat = true },
+        combat = {
+            turn = "Max Stone",
+            can_act = true,
+            animating = false,
+            ap = 6,
+            free_move = 0,
+            attack = { weapon = "unarmed", mode = "punch", ap_cost = 3, aiming = false },
+        },
+        critters = { critter({ tile = 95, hit_chance = 48, can_attack = false, why_not = "out of range" }) },
+        on_screen = { [95] = { 400, 300 } },
+    })
+
+    local rat = state.view().critters[1]
+
+    equal(rat.hit_chance, nil, "hit chance")
+    equal(rat.can_attack, false, "can attack")
+    equal(rat.why_not, "out of range", "why not")
+end
+
 -- Everyone's AP is 0 between turns; showing it then only looks like lost AP.
 function tests.ap_is_shown_only_on_your_turn_and_the_hint_says_whose_it_is()
     local state = fresh_state()
@@ -397,6 +439,33 @@ function tests.each_message_reaches_the_agent_once()
     equal(messages[2], "You hit the Rat for 6 hit points.", "order")
 
     equal(state.view().messages, nil, "nothing new")
+end
+
+-- With two rats at the player's side, "You were hit" has to say which one.
+function tests.lines_from_another_critters_attack_name_the_attacker()
+    local state = fresh_state()
+    local log = { { seq = 1, text = "old news" } }
+    fake_game({
+        messages = function(after)
+            local lines = {}
+            for _, line in ipairs(log) do
+                if line.seq > after then
+                    lines[#lines + 1] = line
+                end
+            end
+            return lines, log[#log].seq
+        end,
+    })
+    state.view()
+
+    log[#log + 1] = { seq = 2, text = "You hit the Rat for 6 hit points." }
+    log[#log + 1] = { seq = 3, text = "You were hit for 4 hit points.", attacker = { id = 7, name = "Rat", visible = true } }
+    log[#log + 1] = { seq = 4, text = "You were hit for 2 hit points.", attacker = { id = 9, name = "Rat", visible = false } }
+    local messages = state.view().messages
+
+    equal(messages[1], "You hit the Rat for 6 hit points.", "your own attack")
+    equal(messages[2], "[Rat, id 7] You were hit for 4 hit points.", "a rat in sight")
+    equal(messages[3], "[someone out of sight] You were hit for 2 hit points.", "a rat out of sight")
 end
 
 function tests.exits_appear_only_while_exploring_or_fighting()
