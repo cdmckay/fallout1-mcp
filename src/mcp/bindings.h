@@ -23,6 +23,9 @@ void mcp_register_inventory_bindings(lua_State* L);
 // table.
 void mcp_register_character_bindings(lua_State* L);
 
+// The text map's bindings (bindings_map.cc), added to the same table.
+void mcp_register_map_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

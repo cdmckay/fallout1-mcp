@@ -279,6 +279,7 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/bindings.h"
     "src/mcp/bindings_character.cc"
     "src/mcp/bindings_inventory.cc"
+    "src/mcp/bindings_map.cc"
     "src/mcp/line_buffer.cc"
     "src/mcp/line_buffer.h"
     "src/mcp/lua_host.cc"
@@ -292,6 +293,10 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/png.h"
     "src/mcp/screens.cc"
     "src/mcp/screens.h"
+    "src/mcp/sight.cc"
+    "src/mcp/sight.h"
+    "src/mcp/sight_rules.cc"
+    "src/mcp/sight_rules.h"
     "src/mcp/socket_server.cc"
     "src/mcp/socket_server.h"
 )

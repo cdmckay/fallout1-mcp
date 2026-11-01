@@ -27,13 +27,17 @@ type View = any;
 
 let client: Client;
 
-async function call(name: string, args: Record<string, unknown> = {}): Promise<View> {
+async function callContent(name: string, args: Record<string, unknown> = {}): Promise<Array<{ type: string; text?: string }>> {
   const result = await client.callTool({ name, arguments: args });
   const content = result.content as Array<{ type: string; text?: string }>;
-  const text = content[0]?.text ?? "";
   if (result.isError) {
-    throw new Error(`${name} failed: ${text}`);
+    throw new Error(`${name} failed: ${content[0]?.text ?? ""}`);
   }
+  return content;
+}
+
+async function call(name: string, args: Record<string, unknown> = {}): Promise<View> {
+  const text = (await callContent(name, args))[0]?.text ?? "";
   return text.startsWith("{") ? JSON.parse(text) : text;
 }
 
@@ -94,6 +98,18 @@ test.skipIf(!enabled)(
     expect(view.player.name).toBe("Max Stone");
     expect(view.player.map.name).toBe("Vault 13");
     expect(view.player.hp).toBe(view.player.max_hp);
+
+    // The text map: the player among the cave's walls and floor, and each
+    // critter on it keyed to one in the critter list.
+    const looked = await callContent("look", { screenshot: false });
+    expect(looked.map((part) => part.type)).toEqual(["text", "text"]);
+    const map = looked[1]?.text ?? "";
+    expect(map).toContain("@");
+    expect(map).toMatch(/# \./);
+    const listed = new Set((JSON.parse(looked[0]?.text ?? "{}").critters ?? []).map((critter: View) => critter.id));
+    for (const [, id] of map.matchAll(/^[a-z]: .*, id (\d+)$/gm)) {
+      expect(listed.has(Number(id))).toBe(true);
+    }
 
     // Fight whatever attacks; otherwise head for the world-map exit.
     let fights = 0;

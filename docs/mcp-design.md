@@ -186,10 +186,36 @@ This view comes back from every combat action, and from `state` during combat.
 
 Decided: fair play is the default.
 
-- **Fair play** reports only what a player could see or know: objects on screen with `OBJECT_SEEN` set, the player's own stats and inventory, the dialog and message text shown, and visible combat state. There are no script variables, no hidden containers' contents, and no `eval_lua` or raw mouse.
+- **Fair play** reports only what a player could see or know: what's visible on screen (below), the player's own stats and inventory, the dialog and message text shown, and visible combat state. There are no script variables, no hidden containers' contents, and no `eval_lua` or raw mouse.
 - **Omniscient** is for debugging. It adds full engine state (every object on the map, global and script variables, hidden inventories), `eval_lua`, `click` and `move_mouse`. It is chosen when the bridge starts (`FALLOUT_MCP_OMNISCIENT=1`), so a playing session can't switch it on by itself. Every result says which mode produced it.
 
 Each state field is tagged fair or omniscient where it is defined in Lua, so the filter is one place, not a check scattered through every tool. Some fields still need a judgement as they are added, for example whether an NPC's hostility shows before combat starts.
+
+### What "visible" means (#20)
+
+Decided: visible is what the screen shows, worked out pixel by pixel from what the engine draws (`src/mcp/sight.cc`).
+
+- **Lighting hides nothing.** The engine never draws darker than a quarter (`LIGHT_LEVEL_MIN`), and a player turns the brightness up, as `look` does.
+- **Line of sight isn't the rule.** Fallout has no fog of war: the screen shows critters around corners and in the next corridor, and a player sees them.
+- **What's drawn over a thing hides it.** That's roofs, and walls or scenery drawn in front. In play test 2 the rats "inside the dark rock" stood in a corridor behind the cave's rock face, which is a wall sprite drawn over them.
+- **`OBJECT_SEEN` isn't sight.** It's the automap's memory: it marks everything within about 16 hexes of anywhere the player has walked, whatever is in between.
+
+The rule:
+
+- **A point** is visible when it's in the map view, above the interface bar, with no roof drawn over it (except where the egg cuts the roof away), as `object_under_mouse` has it.
+- **A critter or item** is visible when at least a quarter of its own pixels show at visible points, with nothing drawn over them. "Drawn over" comes from `obj_create_intersect_list`, the list the game uses to find what's under the mouse. Translucent things and walls cut away by the egg don't hide what's behind them.
+
+`fo.critters` and `fo.hexes` carry the engine's `visible` flag. `lua/mcp/sight.lua` is the one place that applies it: fair play sees what's visible, and omniscient mode sees everything. The critter list and the text map both go through it, so they always agree.
+
+## Text map (#22)
+
+`look` adds a text map of the screen to the state and screenshot, one character per hex. `look` with `screenshot: false` leaves the image out once the map is enough.
+
+- **Layout.** Each line is a row of hexes as they sit on screen, offset half a hex from the next, so odd columns sit half a row down. `walk_to`'s directions stay straight: e and w are two characters along a line; ne, se, sw and nw are a line up or down and a character across; n and s are straight up and down.
+- **Floor.** Floor is drawn only where the player can walk. That's what the game's move cursor tells a player who points at a hex: it shows an X where `make_path` finds no way. A breadth-first walk from the player answers it for the whole screen at once. In a cave this leaves the rock blank (it's floor art the player can't reach), so the corridors stand out between their walls.
+- **Walls.** Walls are drawn where they border that floor.
+- **Critters** get letters keyed to their ids, nearest first, in fair play only those `critters` lists.
+- **Why on `look`.** `look` is the call for getting one's bearings, so one call gives the picture and the map. A separate `map` tool would mean two calls at every new scene.
 
 ## No-mouse punch list
 
