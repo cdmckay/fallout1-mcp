@@ -1,0 +1,122 @@
+// The first slice, end to end: from Claude Code's side of the bridge, launch
+// the game, start a new game with the premade character, and get out of the
+// Vault 13 cave to the world map, fighting the rats on the way, all without
+// the mouse.
+//
+// It drives the real bridge over stdio against the real game, so it needs a
+// built game and the game data, and runs only when asked:
+//
+//   FALLOUT_E2E=1 bun test test/e2e
+//
+// The game runs at turbo 8, on its own systemd unit and socket so it never
+// touches a game you're playing. It uses omniscient mode for one thing: to
+// know where the cave's exit is, rather than exploring for it.
+
+import { afterAll, beforeAll, expect, test } from "bun:test";
+import { join } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { loadConfig } from "../../src/config";
+
+const enabled = process.env.FALLOUT_E2E === "1";
+
+// biome-ignore lint: the view is whatever JSON the game sends
+type View = any;
+
+let client: Client;
+
+async function call(name: string, args: Record<string, unknown> = {}): Promise<View> {
+  const result = await client.callTool({ name, arguments: args });
+  const content = result.content as Array<{ type: string; text?: string }>;
+  const text = content[0]?.text ?? "";
+  if (result.isError) {
+    throw new Error(`${name} failed: ${text}`);
+  }
+  return text.startsWith("{") ? JSON.parse(text) : text;
+}
+
+beforeAll(async () => {
+  if (!enabled) {
+    return;
+  }
+
+  const runtimeDir = loadConfig({}).runtimeDir;
+  client = new Client({ name: "cave-e2e", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: "bun",
+      args: [join(import.meta.dir, "../../src/main.ts")],
+      stderr: "inherit",
+      env: {
+        ...(process.env as Record<string, string>),
+        FALLOUT_MCP_TURBO: "8",
+        FALLOUT_MCP_OMNISCIENT: "1",
+        FALLOUT_MCP_UNIT: "fallout1-mcp-e2e",
+        FALLOUT_MCP_SOCKET: join(runtimeDir, "fallout1-mcp", "e2e.sock"),
+      },
+    }),
+  );
+});
+
+afterAll(async () => {
+  if (!enabled) {
+    return;
+  }
+  await call("quit_game").catch(() => {});
+  await client.close();
+});
+
+test.skipIf(!enabled)(
+  "leaves the Vault 13 cave without the mouse",
+  async () => {
+    const launched = await call("launch_game");
+    expect(launched).toContain("omniscient mode");
+    expect((await call("ping")).turbo).toBe(8);
+
+    // Skip the opening movies until the main menu is up.
+    let view = await call("state");
+    for (let i = 0; i < 4 && view.mode === "movie"; i++) {
+      view = await call("key", { keys: ["escape"] });
+    }
+    expect(view.mode).toBe("main_menu");
+
+    view = await call("key", { keys: ["n"] });
+    expect(view.mode).toBe("character_select");
+
+    view = await call("key", { keys: ["t"] });
+    for (let i = 0; i < 4 && view.mode === "movie"; i++) {
+      view = await call("key", { keys: ["escape"] });
+    }
+    expect(view.mode).toBe("map");
+    expect(view.player.name).toBe("Max Stone");
+    expect(view.player.map.name).toBe("Vault 13");
+    expect(view.player.hp).toBe(view.player.max_hp);
+
+    // Fight whatever attacks; otherwise head for the world-map exit.
+    let fights = 0;
+    for (let step = 0; step < 120 && view.mode !== "world_map"; step++) {
+      if (view.mode === "combat") {
+        const combat = view.combat;
+        const target = (view.critters ?? []).find((critter: View) => critter.hostile);
+        if (combat?.your_turn && target && combat.ap >= combat.attack.ap_cost) {
+          view = await call("attack", { target: target.id }).catch(() => call("end_turn"));
+          fights++;
+        } else {
+          view = await call("end_turn");
+        }
+        continue;
+      }
+
+      expect(view.mode).toBe("map");
+      const exit = (view.exits ?? []).find((candidate: View) => candidate.to === "the world map");
+      expect(exit).toBeDefined();
+      view = await call("walk_to", { tile: exit.tile, run: true });
+    }
+
+    expect(view.mode).toBe("world_map");
+    expect(view.player.hp).toBeGreaterThan(0);
+    // The cave has rats; getting out means having dealt with some.
+    expect(fights).toBeGreaterThan(0);
+  },
+  180_000,
+);

@@ -116,11 +116,13 @@ return function(core)
 
     core.tool({
         name = "end_turn",
-        description = "Ends your turn in combat and waits until it's your turn again or the fight is over, then returns the state view; its messages say what the others did. If it isn't your turn, this just waits for it.",
+        description = "Ends your turn in combat and waits until it's your turn again or the fight is over, then returns the state view; its messages say what the others did. If it isn't your turn, this just waits for it. Outside combat it changes nothing and just returns the view.",
         run = function()
             local combat = fo.combat()
             if combat == nil then
-                core.fail("you're not in combat")
+                -- A view that showed a fight can be a moment out of date: the
+                -- last enemy may have just died.
+                return finish("You're not in combat; the fight may have just ended.")
             end
 
             if combat.can_act then

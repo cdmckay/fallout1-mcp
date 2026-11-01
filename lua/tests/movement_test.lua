@@ -69,7 +69,7 @@ local function setup(options)
         if reply.error then
             return nil, reply.error.message
         end
-        return json.decode(reply.result.content[1].text)
+        return (json.decode(reply.result.content[1].text))
     end
 
     return game, walk

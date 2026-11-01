@@ -9,6 +9,10 @@ namespace fallout {
 // stack.
 void mcp_register_engine_bindings(lua_State* L);
 
+// Keeps the view on the player as they move, so whoever watches the window
+// can follow the agent. Called once per frame.
+void mcp_follow_player();
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

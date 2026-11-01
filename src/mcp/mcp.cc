@@ -22,6 +22,9 @@ namespace fallout {
 
 static bool gMcpEnabled = false;
 static bool gMcpOmniscient = false;
+
+// Whether the view follows the player; FALLOUT_MCP_FOLLOW=0 turns it off.
+static bool gMcpFollow = true;
 static std::string gMcpScriptDir;
 static std::unique_ptr<LuaHost> gMcpLua;
 static SocketServer gMcpSocket;
@@ -218,8 +221,11 @@ bool mcp_init()
         }
     }
 
+    const char* follow = getenv("FALLOUT_MCP_FOLLOW");
+    gMcpFollow = follow == nullptr || strcmp(follow, "0") != 0;
+
     gMcpEnabled = true;
-    mcp_log("%s on %s, %s mode, %ux speed", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale());
+    mcp_log("%s on %s, %s mode, %ux speed%s", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale(), gMcpFollow ? ", following the player" : "");
     return true;
 }
 
@@ -249,6 +255,10 @@ void mcp_tick()
     // expected: Lua's tick handles nesting, and a deferred call that opened a
     // screen is how a waiting command gets resumed while the screen is up.
     gMcpDepth++;
+
+    if (gMcpFollow) {
+        mcp_follow_player();
+    }
 
     std::vector<std::string> lines;
     SocketEvents events = gMcpSocket.poll(lines);

@@ -111,7 +111,7 @@ local function setup(options)
         if reply.error then
             return nil, reply.error.message
         end
-        return json.decode(reply.result.content[1].text)
+        return (json.decode(reply.result.content[1].text))
     end
 
     return fight, call
@@ -213,12 +213,15 @@ function tests.end_turn_out_of_turn_just_waits()
     equal(view.combat.your_turn, true, "your turn")
 end
 
-function tests.end_turn_outside_combat_is_an_error()
+-- The fight can end between the agent's view and its end_turn.
+function tests.end_turn_after_the_fight_ended_just_returns_the_view()
     local _, call = setup({ in_combat = false })
 
-    local _, err = call("end_turn")
+    local view, err = call("end_turn")
 
-    contains(err, "not in combat", "error")
+    equal(err, nil, "error")
+    equal(view.mode, "map", "mode")
+    contains(view.note, "not in combat", "note")
 end
 
 return tests

@@ -656,6 +656,26 @@ static int fo_map_name(lua_State* L)
     return 1;
 }
 
+void mcp_follow_player()
+{
+    // Only when the player has moved: a view panned with the arrow keys
+    // stays put until they take a step.
+    static int lastTile = -1;
+
+    if (!in_game() || world_map_is_open() || dialog_active()) {
+        return;
+    }
+
+    if (obj_dude->tile == lastTile || obj_dude->elevation != map_elevation) {
+        return;
+    }
+
+    lastTile = obj_dude->tile;
+    if (obj_dude->tile != tile_center_tile) {
+        tile_scroll_to(obj_dude->tile, 2);
+    }
+}
+
 void mcp_register_engine_bindings(lua_State* L)
 {
     static const luaL_Reg functions[] = {
