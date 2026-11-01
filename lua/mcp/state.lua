@@ -7,10 +7,11 @@ local state = {}
 
 -- Several of the engine's flags can be set at once: the editor opens over
 -- character select, dialog and combat happen during a game, the world map
--- belongs to a game. The first flag set, top to bottom, is the screen in front.
+-- belongs to a game. After a movie and the main menu, the screen in front is
+-- the innermost one the engine's screen registry names (Pip-Boy, options,
+-- save, help, ...), then an open inventory-family screen (inventory, loot,
+-- barter, ...), then the first of these flags that's set.
 local SCREENS = {
-    { flag = "movie", mode = "movie" },
-    { flag = "main_menu", mode = "main_menu" },
     { flag = "character_editor", mode = "character_editor" },
     { flag = "character_select", mode = "character_select" },
     { flag = "world_map", mode = "world_map" },
@@ -19,16 +20,31 @@ local SCREENS = {
     { flag = "in_game", mode = "map" },
 }
 
--- What a player sees they can do on each screen.
+-- What a player sees they can do on each screen, from the screen-by-screen
+-- audit in docs/mcp-design.md. Keys work with `key`, codes with `press`.
 local HINTS = {
-    movie = "A movie is playing. Press escape to skip it.",
-    main_menu = "Main menu. Keys: n new game, l load game, i intro, c credits, e exit.",
-    character_select = "Choosing a character. Keys: left and right browse the premade characters, t takes this one, m modifies it, c creates a new one, b goes back.",
+    movie = "A movie is playing. Press escape to skip it. The intro is two movies in a row.",
+    main_menu = "Main menu. Keys: n new game, l load game, i intro, c credits, e exit. (Escape here would quit the game, so key skips it.)",
+    character_select = "Choosing a character; `premade` shows the one on screen. Keys: left and right browse the premade characters, t takes this one, m modifies it, c creates a new one, b goes back.",
     character_editor = "Character editor. Keys: return when done, escape to cancel.",
+    character = "Character screen. Escape closes it.",
     world_map = "World map.",
     dialog = "In conversation. Keys 1 to 9 choose a reply.",
     combat = "In combat. attack a critter by id, or end_turn to pass. Keys: n cycles the attack mode, b swaps hands.",
     map = "Exploring the map.",
+    inventory = "Inventory screen. You don't need it: the inventory, equip, unequip, reload and use_item tools work from the map. Escape closes it.",
+    use_item_on = "Choosing an item to use on something; this still needs the mouse. Escape cancels.",
+    loot = "Looting. Keys: A (capital) takes everything, escape closes. Taking single items isn't supported yet.",
+    barter = "Bartering. Keys: m offers the deal on the table, t goes back to talking, escape leaves. Putting items on the table isn't supported yet.",
+    pipboy = "Pip-Boy. Escape closes it. press codes: 500 status, 501 automaps, 502 archives, 504 alarm clock (to rest).",
+    options = "Options. Keys: s save, l load, p preferences, d or escape done, e quit to the main menu.",
+    preferences = "Preferences. Return keeps changes, escape cancels; changing a setting still needs the mouse.",
+    skilldex = "Skilldex. Escape cancels; using a skill from here isn't supported yet.",
+    automap = "Automap. Tab or escape closes it; s toggles the scanner, h and l the detail.",
+    save = "Saving. Up and down pick a slot, return saves (then type a description and press return), escape cancels.",
+    load = "Loading. Up and down pick a slot, return loads it, escape cancels.",
+    elevator = "Elevator. press 500 for the first floor, 501 for the second, and so on; escape cancels.",
+    help = "Help screen. Any key closes it.",
     other = "A screen the state view doesn't know yet. Use look to see it.",
 }
 
@@ -46,20 +62,45 @@ local function screen_point(tile)
     return { x = x, y = y }
 end
 
--- The ways off this map. Exit grids are invisible in play, but a player sees
--- where a path leaves the map, so in fair play an exit counts once its tile is
--- on screen or has been seen; omniscient mode lists them all. Each
--- destination is listed once, at its nearest tile, nearest first.
-function state.exits(player)
-    local omniscient = fo.omniscient()
-    local nearest = {}
+-- The exit tiles the player has seen on the current map, by destination, so
+-- an exit stays listed once seen, as a player remembers where a path left
+-- the map. Forgotten on leaving the map.
+local known_exits = { map = nil, by_destination = {} }
 
+-- Records the exits a player can see from here: in fair play those whose
+-- tiles are on screen or have been seen; omniscient mode, all of them.
+function state.see_exits(player)
+    local map = player.map and player.map.file or nil
+    if known_exits.map ~= map then
+        known_exits = { map = map, by_destination = {} }
+    end
+
+    local omniscient = fo.omniscient()
     for _, exit in ipairs(fo.exits()) do
         if omniscient or exit.seen or fo.tile_center(exit.tile) ~= nil then
-            local distance = fo.tile_distance(player.tile, exit.tile)
-            local best = nearest[exit.map]
+            local tiles = known_exits.by_destination[exit.map]
+            if tiles == nil then
+                tiles = {}
+                known_exits.by_destination[exit.map] = tiles
+            end
+            tiles[exit.tile] = true
+        end
+    end
+end
+
+-- The ways off this map that the player knows of. Exit grids are invisible
+-- in play, but a player sees where a path leaves the map and remembers it.
+-- Each destination is listed once, at its nearest known tile, nearest first.
+function state.exits(player)
+    state.see_exits(player)
+
+    local nearest = {}
+    for destination, tiles in pairs(known_exits.by_destination) do
+        for tile in pairs(tiles) do
+            local distance = fo.tile_distance(player.tile, tile)
+            local best = nearest[destination]
             if best == nil or distance < best.distance then
-                nearest[exit.map] = { map = exit.map, tile = exit.tile, distance = distance }
+                nearest[destination] = { map = destination, tile = tile, distance = distance }
             end
         end
     end
@@ -131,6 +172,9 @@ function state.critters(player, in_combat)
 end
 
 -- The fight from the player's side: whose turn, AP, and the selected attack.
+-- AP is only shown on the player's turn. Everyone's AP is 0 between their
+-- turns, and the player gets max_ap back when theirs starts, so a 0 shown
+-- during someone else's turn would only look like lost AP.
 function state.combat()
     local combat = fo.combat()
     if combat == nil then
@@ -140,9 +184,13 @@ function state.combat()
     local view = {
         your_turn = combat.can_act,
         turn = combat.turn,
-        ap = combat.ap,
-        free_move_ap = combat.free_move > 0 and combat.free_move or nil,
+        max_ap = combat.max_ap,
     }
+
+    if combat.can_act then
+        view.ap = combat.ap
+        view.free_move_ap = combat.free_move > 0 and combat.free_move or nil
+    end
 
     if combat.attack ~= nil then
         view.attack = {
@@ -180,6 +228,18 @@ function state.new_messages()
 end
 
 function state.mode(flags)
+    if flags.movie then
+        return "movie"
+    end
+    if flags.main_menu then
+        return "main_menu"
+    end
+    if flags.screen ~= nil then
+        return flags.screen
+    end
+    if flags.inventory_screen ~= nil then
+        return flags.inventory_screen
+    end
     for _, screen in ipairs(SCREENS) do
         if flags[screen.flag] then
             return screen.mode
@@ -199,12 +259,19 @@ function state.view()
 
     local view = {
         mode = mode,
-        hint = HINTS[mode],
+        hint = HINTS[mode] or HINTS.other,
         player = player,
     }
 
+    if mode == "character_select" then
+        view.premade = fo.premade()
+    end
+
     if mode == "combat" then
         view.combat = state.combat()
+        if view.combat ~= nil and not view.combat.your_turn then
+            view.hint = ("In combat, and it's %s's turn. end_turn waits for yours; your AP refills to %d when it starts."):format(view.combat.turn or "someone else", view.combat.max_ap or 0)
+        end
     end
 
     if player ~= nil and (mode == "map" or mode == "combat") then

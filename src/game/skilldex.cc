@@ -14,6 +14,7 @@
 #include "game/object.h"
 #include "game/skill.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
@@ -116,6 +117,8 @@ static int fontsave;
 // 0x499560
 int skilldex_select()
 {
+    McpScreen mcpScreen("skilldex"); // MCP: for the state view
+
     if (skilldex_start() == -1) {
         debug_printf("\n ** Error loading skilldex dialog data! **\n");
         return -1;

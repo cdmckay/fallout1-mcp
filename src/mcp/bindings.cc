@@ -14,6 +14,7 @@
 #include "game/gconfig.h"
 #include "game/gdialog.h"
 #include "game/intface.h"
+#include "game/inventry.h"
 #include "game/item.h"
 #include "game/main.h"
 #include "game/mainmenu.h"
@@ -25,14 +26,17 @@
 #include "game/proto_types.h"
 #include "game/scripts.h"
 #include "game/select.h"
+#include "game/skill.h"
 #include "game/stat.h"
 #include "game/tile.h"
+#include "game/trait.h"
 #include "game/worldmap.h"
 #include "int/movie.h"
 #include "mcp/lua_fields.h"
 #include "mcp/mcp.h"
 #include "mcp/message_log.h"
 #include "mcp/png.h"
+#include "mcp/screens.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
 
@@ -47,11 +51,29 @@ static int fo_window_focused(lua_State* L)
     return 1;
 }
 
+static const char* inventory_screen_name(int type)
+{
+    switch (type) {
+    case INVENTORY_WINDOW_TYPE_NORMAL:
+        return "inventory";
+    case INVENTORY_WINDOW_TYPE_USE_ITEM_ON:
+        return "use_item_on";
+    case INVENTORY_WINDOW_TYPE_LOOT:
+        return "loot";
+    case INVENTORY_WINDOW_TYPE_TRADE:
+        return "barter";
+    default:
+        return nullptr;
+    }
+}
+
 // fo.flags(): the raw "which screen is up" flags. lua/mcp/state.lua turns
-// them into a mode, since several can be set at once.
+// them into a mode, since several can be set at once. `screen` is the
+// innermost screen from the registry (mcp/screens.h), and `inventory_screen`
+// the open inventory-family screen, if any.
 static int fo_flags(lua_State* L)
 {
-    lua_createtable(L, 0, 8);
+    lua_createtable(L, 0, 10);
     set_bool(L, "movie", moviePlaying() != 0);
     set_bool(L, "main_menu", in_main_menu);
     set_bool(L, "character_select", select_window_id != -1);
@@ -60,6 +82,64 @@ static int fo_flags(lua_State* L)
     set_bool(L, "world_map", world_map_is_open());
     set_bool(L, "dialog", dialog_active());
     set_bool(L, "combat", isInCombat());
+    set_string(L, "inventory_screen", inventory_screen_name(inven_open_screen()));
+
+    const std::vector<std::string>& screens = mcp_screens();
+    if (!screens.empty()) {
+        set_string(L, "screen", screens.back().c_str());
+    }
+    return 1;
+}
+
+// fo.premade(): the character on the character select screen, as that screen
+// shows it, or nil when it isn't up. The premade is loaded into the player
+// object while it's on screen (`select_update_display`).
+static int fo_premade(lua_State* L)
+{
+    if (select_window_id == -1 || obj_dude == nullptr) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    lua_createtable(L, 0, 8);
+    set_string(L, "name", object_name(obj_dude));
+    set_int(L, "hp", stat_level(obj_dude, STAT_MAXIMUM_HIT_POINTS));
+    set_int(L, "ac", stat_level(obj_dude, STAT_ARMOR_CLASS));
+    set_int(L, "ap", stat_level(obj_dude, STAT_MAXIMUM_ACTION_POINTS));
+
+    static const char* const kSpecial[] = { "strength", "perception", "endurance", "charisma", "intelligence", "agility", "luck" };
+    lua_createtable(L, 0, 7);
+    for (int stat = STAT_STRENGTH; stat <= STAT_LUCK; stat++) {
+        set_int(L, kSpecial[stat - STAT_STRENGTH], stat_level(obj_dude, stat));
+    }
+    lua_setfield(L, -2, "special");
+
+    int traits[2];
+    trait_get(&traits[0], &traits[1]);
+    lua_newtable(L);
+    int count = 0;
+    for (int trait : traits) {
+        if (trait != -1) {
+            lua_pushstring(L, trait_name(trait));
+            lua_rawseti(L, -2, ++count);
+        }
+    }
+    lua_setfield(L, -2, "traits");
+
+    int tagged[NUM_TAGGED_SKILLS];
+    skill_get_tags(tagged, NUM_TAGGED_SKILLS);
+    lua_newtable(L);
+    count = 0;
+    for (int skill : tagged) {
+        if (skill != -1) {
+            lua_createtable(L, 0, 2);
+            set_string(L, "name", skill_name(skill));
+            set_int(L, "percent", skill_level(obj_dude, skill));
+            lua_rawseti(L, -2, ++count);
+        }
+    }
+    lua_setfield(L, -2, "tagged_skills");
+
     return 1;
 }
 
@@ -99,13 +179,17 @@ static int fo_player(lua_State* L)
     return 1;
 }
 
-// fo.screenshot(): the current frame as a base64 PNG, plus its width and
+// fo.screenshot(gamma): the current frame as a base64 PNG, plus its width and
 // height. The frame is the game's logical resolution whatever the window's
-// scale, and the coordinates match the game's own.
+// scale, and the coordinates match the game's own. A gamma below 1 brightens
+// it, as turning up the game's brightness would.
 static int fo_screenshot(lua_State* L)
 {
+    float gamma = static_cast<float>(luaL_optnumber(L, 1, 1.0));
+    luaL_argcheck(L, gamma > 0.0f && gamma <= 4.0f, 1, "gamma must be above 0 and at most 4");
+
     std::vector<unsigned char> png;
-    if (!mcp_encode_png(gSdlTextureSurface, png)) {
+    if (!mcp_encode_png(gSdlTextureSurface, png, gamma)) {
         return luaL_error(L, "can't capture the screen: %s", SDL_GetError());
     }
 
@@ -275,6 +359,30 @@ static int fo_tile_center(lua_State* L)
     return 2;
 }
 
+// fo.view_center(): the tile the view is centered on.
+static int fo_view_center(lua_State* L)
+{
+    lua_pushinteger(L, tile_center_tile);
+    return 1;
+}
+
+// fo.set_view_center(tile, refresh): moves the view, as scrolling does, within
+// the same limits a player scrolling has: no further than the game lets the
+// view stray from the player, and not past scroll blockers. Without `refresh`
+// nothing is redrawn, so the move can be undone unseen. Returns whether the
+// view moved.
+static int fo_set_view_center(lua_State* L)
+{
+    int tile = check_tile(L, 1);
+    bool refresh = lua_toboolean(L, 2) != 0;
+    if (!in_game()) {
+        return luaL_error(L, "no game in progress");
+    }
+
+    lua_pushboolean(L, tile_set_center(tile, refresh ? TILE_SET_CENTER_REFRESH_WINDOW : 0) == 0);
+    return 1;
+}
+
 // fo.tile_distance(a, b): hexes between two tiles.
 static int fo_tile_distance(lua_State* L)
 {
@@ -429,6 +537,7 @@ static int fo_combat(lua_State* L)
     set_bool(L, "can_act", playerTurn && (combat_state & COMBAT_STATE_0x02) != 0);
     set_bool(L, "animating", combat_is_animating() || anim_busy(obj_dude) != 0);
     set_int(L, "ap", obj_dude->data.critter.combat.ap);
+    set_int(L, "max_ap", stat_level(obj_dude, STAT_MAXIMUM_ACTION_POINTS));
     set_int(L, "free_move", combat_free_move);
 
     int hitMode;
@@ -671,6 +780,7 @@ void mcp_register_engine_bindings(lua_State* L)
     static const luaL_Reg functions[] = {
         { "window_focused", fo_window_focused },
         { "flags", fo_flags },
+        { "premade", fo_premade },
         { "player", fo_player },
         { "screenshot", fo_screenshot },
         { "inject", fo_inject },
@@ -682,6 +792,8 @@ void mcp_register_engine_bindings(lua_State* L)
         { "tile_toward", fo_tile_toward },
         { "tile_center", fo_tile_center },
         { "tile_distance", fo_tile_distance },
+        { "view_center", fo_view_center },
+        { "set_view_center", fo_set_view_center },
         { "tile_direction", fo_tile_direction },
         { "exits", fo_exits },
         { "map_name", fo_map_name },

@@ -39,6 +39,7 @@
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
@@ -338,6 +339,8 @@ void ResetLoadSave()
 // 0x46D9C4
 int SaveGame(int mode)
 {
+    McpScreen mcpScreen("save"); // MCP: for the state view
+
     MessageListItem messageListItem;
 
     ls_error_code = 0;
@@ -846,6 +849,8 @@ static int QuickSnapShot()
 // 0x46E754
 int LoadGame(int mode)
 {
+    McpScreen mcpScreen("load"); // MCP: for the state view
+
     MessageListItem messageListItem;
 
     const char* body[] = {

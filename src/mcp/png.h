@@ -10,7 +10,8 @@
 namespace fallout {
 
 // Encodes `surface`, in any pixel format SDL can convert to RGB24, as a PNG.
-bool mcp_encode_png(SDL_Surface* surface, std::vector<unsigned char>& png);
+// Each channel goes through a gamma curve first; below 1 brightens the darks.
+bool mcp_encode_png(SDL_Surface* surface, std::vector<unsigned char>& png, float gamma = 1.0f);
 
 // Standard base64 (RFC 4648) with padding, as MCP image content expects.
 std::string mcp_base64(const unsigned char* data, size_t length);

@@ -48,6 +48,7 @@
 #include "int/movie.h"
 #include "int/window.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/gnw/debug.h"
 #include "plib/gnw/gnw.h"
@@ -1089,6 +1090,8 @@ static void game_unload_info()
 // 0x43D130
 static void game_help()
 {
+    McpScreen mcpScreen("help"); // MCP: for the state view
+
     bool isoWasEnabled = map_disable_bk_processes();
     gmouse_3d_off();
 

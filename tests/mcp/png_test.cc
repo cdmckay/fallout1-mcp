@@ -76,6 +76,33 @@ TEST_CASE("mcp_encode_png round-trips the game's RGB888 frame format")
     stbi_image_free(decoded);
 }
 
+TEST_CASE("mcp_encode_png brightens the darks with a gamma below 1")
+{
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, 3, 1, 32, SDL_PIXELFORMAT_RGB888);
+    REQUIRE(surface != nullptr);
+    Uint32* row = static_cast<Uint32*>(surface->pixels);
+    row[0] = SDL_MapRGB(surface->format, 0, 0, 0);
+    row[1] = SDL_MapRGB(surface->format, 64, 64, 64);
+    row[2] = SDL_MapRGB(surface->format, 255, 255, 255);
+
+    std::vector<unsigned char> png;
+    REQUIRE(mcp_encode_png(surface, png, 0.5f));
+    SDL_FreeSurface(surface);
+
+    int width;
+    int height;
+    int channels;
+    unsigned char* decoded = stbi_load_from_memory(png.data(), static_cast<int>(png.size()), &width, &height, &channels, 3);
+    REQUIRE(decoded != nullptr);
+
+    // Black and white stay put; a dark grey comes up: 255 * sqrt(64 / 255).
+    REQUIRE(decoded[0] == 0);
+    REQUIRE(decoded[3] == 128);
+    REQUIRE(decoded[6] == 255);
+
+    stbi_image_free(decoded);
+}
+
 TEST_CASE("mcp_encode_png rejects a missing surface")
 {
     std::vector<unsigned char> png;

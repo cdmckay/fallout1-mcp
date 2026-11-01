@@ -25,6 +25,7 @@
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
@@ -531,6 +532,8 @@ static unsigned char stat_flag;
 // 0x486A80
 int pipboy(int intent)
 {
+    McpScreen mcpScreen("pipboy"); // MCP: for the state view
+
     intent = StartPipboy(intent);
     if (intent == -1) {
         return -1;

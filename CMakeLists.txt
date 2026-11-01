@@ -289,6 +289,8 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/message_log.h"
     "src/mcp/png.cc"
     "src/mcp/png.h"
+    "src/mcp/screens.cc"
+    "src/mcp/screens.h"
     "src/mcp/socket_server.cc"
     "src/mcp/socket_server.h"
 )

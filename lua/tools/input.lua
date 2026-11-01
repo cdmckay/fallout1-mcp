@@ -12,10 +12,21 @@ local READ_TIMEOUT_MS = 5000
 return function(core)
     -- Injects each code in turn, waiting until the game has read it before
     -- sending the next, so a sequence works across a change of screen.
+    local ESCAPE = 27
+
     local function send(codes, labels)
         local unread = {}
+        local skipped = false
 
         for i, code in ipairs(codes) do
+            -- Escape skips a movie, but on the main menu it quits the game.
+            -- The intro's movies end on the main menu, so a run of escapes
+            -- meant for them must not carry on into it.
+            if code == ESCAPE and state.mode(fo.flags()) == "main_menu" then
+                skipped = true
+                goto next
+            end
+
             if not fo.inject(code) then
                 core.fail("the game's input queue is full; try again in a moment")
             end
@@ -30,11 +41,15 @@ return function(core)
             end
 
             core.wait_frames(SETTLE_FRAMES)
+
+            ::next::
         end
 
         local view = state.view()
         if #unread > 0 then
             view.note = ("The screen hasn't read %s yet; it's queued and may still take effect. Check with state or look."):format(unread[1])
+        elseif skipped then
+            view.note = "Skipped escape on the main menu, where it would quit the game. To quit, press e."
         end
         return { data = view }
     end

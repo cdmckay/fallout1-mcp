@@ -1,5 +1,7 @@
 #include "mcp/png.h"
 
+#include <cmath>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include <stb_image_write.h>
@@ -13,7 +15,7 @@ static void append_bytes(void* context, void* data, int size)
     png->insert(png->end(), bytes, bytes + size);
 }
 
-bool mcp_encode_png(SDL_Surface* surface, std::vector<unsigned char>& png)
+bool mcp_encode_png(SDL_Surface* surface, std::vector<unsigned char>& png, float gamma)
 {
     if (surface == nullptr) {
         return false;
@@ -22,6 +24,20 @@ bool mcp_encode_png(SDL_Surface* surface, std::vector<unsigned char>& png)
     SDL_Surface* rgb = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGB24, 0);
     if (rgb == nullptr) {
         return false;
+    }
+
+    if (gamma != 1.0f) {
+        unsigned char curve[256];
+        for (int value = 0; value < 256; value++) {
+            curve[value] = static_cast<unsigned char>(std::lround(255.0 * std::pow(value / 255.0, gamma)));
+        }
+
+        for (int y = 0; y < rgb->h; y++) {
+            unsigned char* row = static_cast<unsigned char*>(rgb->pixels) + y * rgb->pitch;
+            for (int x = 0; x < rgb->w * 3; x++) {
+                row[x] = curve[row[x]];
+            }
+        }
     }
 
     png.clear();

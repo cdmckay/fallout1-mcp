@@ -24,6 +24,9 @@ function support.quiet_world()
     fo.equipped = function()
         return nil
     end
+    fo.premade = function()
+        return nil
+    end
     fo.awareness = function()
         return false
     end

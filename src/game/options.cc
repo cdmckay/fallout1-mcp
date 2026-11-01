@@ -22,6 +22,7 @@
 #include "game/tile.h"
 #include "game/worldmap.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
@@ -380,6 +381,8 @@ static PreferenceDescription btndat[PREF_COUNT] = {
 // 0x481328
 int do_options()
 {
+    McpScreen mcpScreen("options"); // MCP: for the state view
+
     if (OptnStart() == -1) {
         debug_printf("\nOPTION MENU: Error loading option dialog data!\n");
         return -1;
@@ -831,6 +834,8 @@ static void ShadeScreen(bool is_world_map)
 // 0x481E84
 static int do_prefscreen()
 {
+    McpScreen mcpScreen("preferences"); // MCP: for the state view
+
     if (PrefStart() == -1) {
         debug_printf("\nPREFERENCE MENU: Error loading preference dialog data!\n");
         return -1;

@@ -87,13 +87,37 @@ end
 function tests.key_presses_each_key_once_it_is_read_and_returns_the_view()
     local _, engine, read = setup()
 
-    engine.request({ id = 1, op = "call", tool = "key", args = { keys = { "n", "escape" } } })
+    engine.request({ id = 1, op = "call", tool = "key", args = { keys = { "n", "t" } } })
     engine.frames(30)
 
     equal(#read, 2, "keys read")
     equal(read[1], 110, "first key")
-    equal(read[2], 27, "second key")
+    equal(read[2], 116, "second key")
     equal(result(engine).mode, "main_menu", "view")
+end
+
+-- The intro's movies end on the main menu, where escape quits the game.
+function tests.escape_on_the_main_menu_is_skipped_with_a_note()
+    local _, engine, read = setup()
+
+    engine.request({ id = 1, op = "call", tool = "key", args = { keys = { "escape", "n" } } })
+    engine.frames(30)
+
+    equal(#read, 1, "keys read")
+    equal(read[1], 110, "only n reached the game")
+    contains(result(engine).note, "would quit the game", "note")
+end
+
+function tests.escape_elsewhere_is_sent()
+    local _, engine, read = setup()
+    fo.flags = function()
+        return { movie = true }
+    end
+
+    engine.request({ id = 1, op = "call", tool = "key", args = { keys = { "escape" } } })
+    engine.frames(30)
+
+    equal(read[1], 27, "escape reached the game")
 end
 
 function tests.key_checks_every_name_before_pressing_any()

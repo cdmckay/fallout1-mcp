@@ -95,6 +95,46 @@ function tests.the_screen_in_front_wins()
     equal(state.mode({ in_game = true, movie = true }), "movie", "movie in a game")
 end
 
+function tests.a_registered_screen_or_inventory_screen_is_in_front_of_the_map()
+    local state = fresh_state()
+
+    equal(state.mode({ in_game = true, screen = "pipboy" }), "pipboy", "Pip-Boy over the map")
+    equal(state.mode({ in_game = true, combat = true, inventory_screen = "inventory" }), "inventory", "inventory in combat")
+    equal(state.mode({ in_game = true, dialog = true, inventory_screen = "barter" }), "barter", "barter inside dialog")
+    equal(state.mode({ in_game = true, screen = "save", inventory_screen = "inventory" }), "save", "registry first")
+    equal(state.mode({ in_game = true, movie = true, screen = "pipboy" }), "movie", "a movie from the Pip-Boy")
+    equal(state.mode({ character_select = true, screen = "character_editor" }), "character_editor", "editor over select")
+end
+
+function tests.every_screen_the_engine_names_has_a_hint()
+    local state = fresh_state()
+    local names = {
+        "inventory", "use_item_on", "loot", "barter", "pipboy", "options", "preferences",
+        "skilldex", "automap", "save", "load", "elevator", "help", "character", "character_editor",
+    }
+
+    for _, name in ipairs(names) do
+        fake_game({ flags = { in_game = true, screen = name }, no_player = true })
+        local view = state.view()
+        equal(view.mode, name, "mode")
+        assert(not view.hint:find("doesn't know", 1, true), "no specific hint for " .. name)
+    end
+end
+
+function tests.character_select_shows_the_premade_on_screen()
+    local state = fresh_state()
+    fake_game({ flags = { character_select = true }, no_player = true })
+    fo.premade = function()
+        return { name = "Max Stone", traits = { "Bruiser", "Heavy Handed" } }
+    end
+
+    local view = state.view()
+
+    equal(view.mode, "character_select", "mode")
+    equal(view.premade.name, "Max Stone", "premade")
+    equal(view.premade.traits[1], "Bruiser", "traits")
+end
+
 function tests.the_view_has_a_hint_for_every_mode()
     local state = fresh_state()
 
@@ -150,6 +190,26 @@ function tests.fair_play_lists_exits_on_screen_or_seen_once_per_destination_near
     equal(exits[1].screen.x, 300, "screen position")
     equal(exits[2].to, "map 7", "seen exit")
     equal(exits[2].screen, nil, "off screen")
+end
+
+function tests.an_exit_once_seen_stays_listed_until_the_map_changes()
+    local state = fresh_state()
+    local on_screen = { [90] = { 300, 500 } }
+    fake_game({ exits = { { tile = 90, map = -1, seen = false } }, on_screen = on_screen })
+    local map = { file = "V13ENT.MAP" }
+    fo.player = function()
+        return { tile = 100, map = map }
+    end
+
+    equal(#state.view().exits, 1, "seen on screen")
+
+    on_screen[90] = nil
+    local exits = state.view().exits
+    equal(#exits, 1, "still listed off screen")
+    equal(exits[1].screen, nil, "but not on screen")
+
+    map = { file = "VAULT13.MAP" }
+    equal(#state.view().exits, 0, "forgotten on a new map")
 end
 
 function tests.omniscient_mode_lists_every_exit()
@@ -257,6 +317,23 @@ function tests.combat_shows_the_turn_the_attack_and_the_odds_against_each_critte
     equal(view.critters[1].why_not, "not enough AP", "why not")
     equal(view.critters[2].hit_chance, 87, "hit chance")
     equal(view.critters[2].hostile, true, "hostile")
+end
+
+-- Everyone's AP is 0 between turns; showing it then only looks like lost AP.
+function tests.ap_is_shown_only_on_your_turn_and_the_hint_says_whose_it_is()
+    local state = fresh_state()
+    fake_game({
+        flags = { in_game = true, combat = true },
+        combat = { turn = "Cave Rat", can_act = false, animating = false, ap = 0, max_ap = 6, free_move = 0 },
+    })
+
+    local view = state.view()
+
+    equal(view.combat.your_turn, false, "your turn")
+    equal(view.combat.ap, nil, "ap")
+    equal(view.combat.max_ap, 6, "max ap")
+    support.contains(view.hint, "Cave Rat's turn", "hint")
+    support.contains(view.hint, "refills to 6", "hint")
 end
 
 function tests.each_message_reaches_the_agent_once()

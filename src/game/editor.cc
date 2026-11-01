@@ -28,6 +28,7 @@
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
 #include "platform_compat.h"
+#include "mcp/screens.h"
 #include "plib/color/color.h"
 #include "plib/db/db.h"
 #include "plib/gnw/button.h"
@@ -630,6 +631,8 @@ static unsigned char first_skill_list;
 // 0x42C40C
 int editor_design(bool isCreationMode)
 {
+    McpScreen mcpScreen(isCreationMode ? "character_editor" : "character"); // MCP: for the state view
+
     char* messageListItemText;
     char line1[128];
     char line2[128];
