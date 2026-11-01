@@ -150,6 +150,8 @@ function state.combat()
             mode = combat.attack.mode,
             ap_cost = combat.attack.ap_cost,
             aimed = combat.attack.aiming or nil,
+            ammo = combat.attack.ammo,
+            ammo_capacity = combat.attack.ammo_capacity,
         }
     end
 
@@ -206,6 +208,7 @@ function state.view()
     end
 
     if player ~= nil and (mode == "map" or mode == "combat") then
+        view.equipped = fo.equipped()
         view.critters = state.critters(player, mode == "combat")
         view.exits = state.exits(player)
     end

@@ -330,6 +330,9 @@ static Inventory* pud;
 // 0x59CEF8
 static int i_wid;
 
+// MCP: The open inventory-family screen (an INVENTORY_WINDOW_TYPE_*), or -1.
+static int inven_open_type = -1;
+
 // 0x059CEFC
 static Object* i_rhand;
 
@@ -529,6 +532,9 @@ void handle_inventory()
 // 0x462818
 bool setup_inventory(int inventoryWindowType)
 {
+    // MCP
+    inven_open_type = inventoryWindowType;
+
     dropped_explosive = 0;
     curr_stack = 0;
     stack_offset[0] = 0;
@@ -1273,6 +1279,9 @@ void exit_inventory(bool shouldEnableIso)
     }
 
     win_delete(i_wid);
+
+    // MCP
+    inven_open_type = -1;
 
     gmouse_enable();
 
@@ -5396,6 +5405,13 @@ int inven_set_timer(Object* a1)
     }
 
     return seconds;
+}
+
+// MCP: The open inventory-family screen, as an INVENTORY_WINDOW_TYPE_*, or -1
+// when none is open. Items mustn't be moved from outside while one is.
+int inven_open_screen()
+{
+    return inven_open_type;
 }
 
 } // namespace fallout

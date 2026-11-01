@@ -277,10 +277,12 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
 target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/bindings.cc"
     "src/mcp/bindings.h"
+    "src/mcp/bindings_inventory.cc"
     "src/mcp/line_buffer.cc"
     "src/mcp/line_buffer.h"
     "src/mcp/lua_host.cc"
     "src/mcp/lua_host.h"
+    "src/mcp/lua_fields.h"
     "src/mcp/mcp.cc"
     "src/mcp/mcp.h"
     "src/mcp/message_log.cc"

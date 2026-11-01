@@ -13,6 +13,12 @@ void mcp_register_engine_bindings(lua_State* L);
 // can follow the agent. Called once per frame.
 void mcp_follow_player();
 
+// Whether a game is in progress, with a player on a map.
+bool mcp_in_game();
+
+// The inventory bindings (bindings_inventory.cc), added to the same table.
+void mcp_register_inventory_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

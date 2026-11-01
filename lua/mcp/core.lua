@@ -270,26 +270,34 @@ function core.on_line(line)
         return
     end
 
-    local op = request.op
-    if op == "list" then
-        reply(id, { access = core.access(), tools = list_tools() })
-    elseif op == "call" then
-        local def = tools[request.tool]
-        if def == nil or not available(def) then
-            reply_error(id, "unknown tool: " .. tostring(request.tool))
-        elseif current ~= nil then
-            reply_error(id, "busy: still running " .. current.tool)
+    -- Every request gets an answer, even when handling it goes wrong;
+    -- otherwise the bridge waits until it times out.
+    local ok, err = xpcall(function()
+        local op = request.op
+        if op == "list" then
+            reply(id, { access = core.access(), tools = list_tools() })
+        elseif op == "call" then
+            local def = tools[request.tool]
+            if def == nil or not available(def) then
+                reply_error(id, "unknown tool: " .. tostring(request.tool))
+            elseif current ~= nil then
+                reply_error(id, "busy: still running " .. current.tool)
+            else
+                start(id, def, request.args)
+            end
+        elseif op == "reload" then
+            if current ~= nil then
+                reply_error(id, "busy: still running " .. current.tool)
+            else
+                fo.reload(id)
+            end
         else
-            start(id, def, request.args)
+            reply_error(id, "unknown op: " .. tostring(op))
         end
-    elseif op == "reload" then
-        if current ~= nil then
-            reply_error(id, "busy: still running " .. current.tool)
-        else
-            fo.reload(id)
-        end
-    else
-        reply_error(id, "unknown op: " .. tostring(op))
+    end, debug.traceback)
+
+    if not ok then
+        reply_error(id, "the game's Lua failed handling this request: " .. tostring(err))
     end
 end
 

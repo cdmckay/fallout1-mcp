@@ -5,4 +5,5 @@ return function(core)
     require("tools.input")(core)
     require("tools.movement")(core)
     require("tools.combat")(core)
+    require("tools.inventory")(core)
 end

@@ -121,6 +121,20 @@ function tests.unknown_tools_and_bad_requests_get_errors()
     contains(engine.reply().error.message, "unknown op", "bad op")
 end
 
+-- A broken binding mustn't leave the bridge waiting for an answer.
+function tests.a_request_that_fails_to_dispatch_still_gets_an_answer()
+    local _, engine = support.new()
+    fo.reload = function()
+        error("bad argument #1 to 'reload'")
+    end
+
+    engine.request({ id = 9, op = "reload" })
+
+    local reply = engine.reply()
+    equal(reply.id, 9, "id")
+    contains(reply.error.message, "bad argument", "error")
+end
+
 function tests.fail_reaches_the_agent_without_a_traceback()
     local core, engine = support.new()
     core.tool({ name = "picky", run = function() core.fail("tile 99999 is off the map") end })

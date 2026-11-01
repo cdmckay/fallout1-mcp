@@ -29,6 +29,7 @@
 #include "game/tile.h"
 #include "game/worldmap.h"
 #include "int/movie.h"
+#include "mcp/lua_fields.h"
 #include "mcp/mcp.h"
 #include "mcp/message_log.h"
 #include "mcp/png.h"
@@ -36,26 +37,6 @@
 #include "plib/gnw/svga.h"
 
 namespace fallout {
-
-static void set_bool(lua_State* L, const char* key, bool value)
-{
-    lua_pushboolean(L, value);
-    lua_setfield(L, -2, key);
-}
-
-static void set_int(lua_State* L, const char* key, lua_Integer value)
-{
-    lua_pushinteger(L, value);
-    lua_setfield(L, -2, key);
-}
-
-static void set_string(lua_State* L, const char* key, const char* value)
-{
-    if (value != nullptr) {
-        lua_pushstring(L, value);
-        lua_setfield(L, -2, key);
-    }
-}
 
 // fo.window_focused(): whether the game window has keyboard focus. With MCP
 // on, the game keeps running either way.
@@ -157,9 +138,14 @@ static int fo_input_pending(lua_State* L)
     return 1;
 }
 
-static bool in_game()
+bool mcp_in_game()
 {
     return main_game_is_running() && obj_dude != nullptr;
+}
+
+static bool in_game()
+{
+    return mcp_in_game();
 }
 
 static int check_tile(lua_State* L, int index)
@@ -456,6 +442,10 @@ static int fo_combat(lua_State* L)
         set_int(L, "ap_cost", item_w_mp_cost(obj_dude, hitMode, aiming));
         set_int(L, "range", item_w_range(obj_dude, hitMode));
         set_string(L, "weapon", weapon != nullptr ? object_name(weapon) : "unarmed");
+        if (weapon != nullptr && item_w_max_ammo(weapon) > 0) {
+            set_int(L, "ammo", item_w_curr_ammo(weapon));
+            set_int(L, "ammo_capacity", item_w_max_ammo(weapon));
+        }
         lua_setfield(L, -2, "attack");
     }
 
@@ -706,6 +696,7 @@ void mcp_register_engine_bindings(lua_State* L)
     };
 
     luaL_setfuncs(L, functions, 0);
+    mcp_register_inventory_bindings(L);
 }
 
 } // namespace fallout
