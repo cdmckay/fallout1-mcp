@@ -1,5 +1,8 @@
 #include "plib/gnw/dxinput.h"
 
+#include "plib/gnw/mouse.h"
+#include "plib/gnw/svga.h"
+
 namespace fallout {
 
 static bool dxinput_mouse_init();
@@ -9,6 +12,10 @@ static void dxinput_keyboard_exit();
 
 static int gMouseWheelDeltaX = 0;
 static int gMouseWheelDeltaY = 0;
+
+// CE: Whether the mouse follows the system pointer instead of reading relative
+// motion. See `dxinput_mouse_init`.
+static bool gMouseAbsolute = false;
 
 // 0x4E0400
 bool dxinput_init()
@@ -63,7 +70,26 @@ bool dxinput_get_mouse_state(MouseData* mouseState)
     // update mouse position manually.
     SDL_PumpEvents();
 
-    Uint32 buttons = SDL_GetRelativeMouseState(&(mouseState->x), &(mouseState->y));
+    Uint32 buttons;
+    if (gMouseAbsolute) {
+        int windowX;
+        int windowY;
+        buttons = SDL_GetMouseState(&windowX, &windowY);
+
+        float logicalX;
+        float logicalY;
+        SDL_RenderWindowToLogical(gSdlRenderer, windowX, windowY, &logicalX, &logicalY);
+
+        // Callers move the cursor by a delta, so report the distance from the
+        // cursor to the pointer.
+        int cursorX;
+        int cursorY;
+        mouse_get_position(&cursorX, &cursorY);
+        mouseState->x = static_cast<int>(logicalX) - cursorX;
+        mouseState->y = static_cast<int>(logicalY) - cursorY;
+    } else {
+        buttons = SDL_GetRelativeMouseState(&(mouseState->x), &(mouseState->y));
+    }
     mouseState->buttons[0] = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
     mouseState->buttons[1] = (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
     mouseState->wheelX = gMouseWheelDeltaX;
@@ -103,7 +129,20 @@ bool dxinput_read_keyboard_buffer(KeyboardData* keyboardData)
 // 0x4E070C
 bool dxinput_mouse_init()
 {
+    // CE: Relative mode reproduces DirectInput's mouse deltas, but it also
+    // locks the pointer to the window. In a window, follow the system pointer
+    // instead, so it can leave.
+    if ((SDL_GetWindowFlags(gSdlWindow) & SDL_WINDOW_FULLSCREEN) == 0) {
+        gMouseAbsolute = true;
+        return true;
+    }
+
     return SDL_SetRelativeMouseMode(SDL_TRUE) == 0;
+}
+
+bool dxinput_mouse_is_absolute()
+{
+    return gMouseAbsolute;
 }
 
 // 0x4E078C

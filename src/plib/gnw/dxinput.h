@@ -23,6 +23,7 @@ void dxinput_exit();
 bool dxinput_acquire_mouse();
 bool dxinput_unacquire_mouse();
 bool dxinput_get_mouse_state(MouseData* mouseData);
+bool dxinput_mouse_is_absolute();
 bool dxinput_acquire_keyboard();
 bool dxinput_unacquire_keyboard();
 bool dxinput_flush_keyboard_buffer();
