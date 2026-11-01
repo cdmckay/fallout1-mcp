@@ -9,8 +9,10 @@
 //   FALLOUT_E2E=1 bun test test/e2e
 //
 // The game runs at turbo 8, on its own systemd unit and socket so it never
-// touches a game you're playing. It uses omniscient mode for one thing: to
-// know where the cave's exit is, rather than exploring for it.
+// touches a game you're playing. They're named after `FALLOUT_MCP_UNIT` with
+// `-e2e` added, so worktrees that each run their own game can run this at the
+// same time. It uses omniscient mode for one thing: to know where the cave's
+// exit is, rather than exploring for it.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { join } from "node:path";
@@ -41,6 +43,7 @@ beforeAll(async () => {
   }
 
   const runtimeDir = loadConfig({}).runtimeDir;
+  const unit = `${process.env.FALLOUT_MCP_UNIT ?? "fallout1-mcp"}-e2e`;
   client = new Client({ name: "cave-e2e", version: "1.0.0" });
   await client.connect(
     new StdioClientTransport({
@@ -51,8 +54,8 @@ beforeAll(async () => {
         ...(process.env as Record<string, string>),
         FALLOUT_MCP_TURBO: "8",
         FALLOUT_MCP_OMNISCIENT: "1",
-        FALLOUT_MCP_UNIT: "fallout1-mcp-e2e",
-        FALLOUT_MCP_SOCKET: join(runtimeDir, "fallout1-mcp", "e2e.sock"),
+        FALLOUT_MCP_UNIT: unit,
+        FALLOUT_MCP_SOCKET: join(runtimeDir, "fallout1-mcp", `${unit}.sock`),
       },
     }),
   );

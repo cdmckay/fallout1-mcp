@@ -73,7 +73,7 @@ The end-to-end test (`bridge/test/e2e/cave.test.ts`) plays the real game through
 cd bridge && FALLOUT_E2E=1 bun test test/e2e
 ```
 
-It takes about 10 s at turbo 8. It uses its own unit (`fallout1-mcp-e2e`) and socket, so it never touches a running game. It uses omniscient mode only to find the cave's exit.
+It takes about 10 s at turbo 8. It uses its own unit and socket, named after `FALLOUT_MCP_UNIT` with `-e2e` added (`fallout1-mcp-e2e` by default), so it never touches a running game. It uses omniscient mode only to find the cave's exit.
 
 ## Game data
 
@@ -107,6 +107,22 @@ systemd-run --user --unit=fallout1-mcp --collect \
 ```
 
 Its output is in `journalctl --user -u fallout1-mcp`, and `systemctl --user stop fallout1-mcp` closes it. The session can't read that process's `/proc` entries; run anything that inspects it through `hop`.
+
+### Several games at once
+
+Each worktree can run a game of its own beside the others. Give each game its own unit, socket and data directory, or two games will stop each other and share saves. The bridge reads all three from the environment, and it runs the build and `lua/` of the checkout it lives in:
+
+```bash
+cp -r --reflink=always ~/.local/share/fallout1-mcp ~/.local/share/fallout1-mcp-<name>
+FALLOUT_MCP_UNIT=fallout1-mcp-<name> \
+  FALLOUT_MCP_SOCKET=/run/user/1000/fallout1-mcp/<name>.sock \
+  FALLOUT_DATA_DIR=$HOME/.local/share/fallout1-mcp-<name> \
+  bun bridge/src/main.ts   # or the e2e test, or a script driving the bridge
+```
+
+On mango's btrfs the reflink copy is instant and takes no extra space. It also keeps each game's saves and `fallout.cfg` apart. Claude Code's Bash calls don't keep exported variables, so set the three on every command that starts a bridge. The e2e test names its game after `FALLOUT_MCP_UNIT`, so it doesn't collide either.
+
+The plain `fallout1-mcp` unit and data directory belong to Cameron and the play tests. Never stop or reuse them from a worktree.
 
 ## Changes from upstream
 
