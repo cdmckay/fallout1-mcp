@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(Catch2)
 
 # The MCP pieces that don't need the engine, so they're tested on their own.
 add_executable(mcp_tests
+    "mcp/combat_rules_test.cc"
     "mcp/line_buffer_test.cc"
     "mcp/lua_host_test.cc"
     "mcp/message_log_test.cc"
@@ -18,6 +19,7 @@ add_executable(mcp_tests
     "mcp/screens_test.cc"
     "mcp/sight_rules_test.cc"
     "mcp/socket_server_test.cc"
+    "${CMAKE_SOURCE_DIR}/src/mcp/combat_rules.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/line_buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/lua_host.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/message_log.cc"

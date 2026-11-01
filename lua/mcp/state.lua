@@ -36,7 +36,7 @@ local HINTS = {
     world_map = "World map; `world_map` below says where you are and lists the places you know, nearest first, in map squares. travel goes to one of them by name, or to a point (x, y in squares); enter goes into the place you're standing on. Random encounters can stop a trip. Keys: arrows scroll the view, c centres it on you, a toggles following you; press 512 opens the town map.",
     town_map = "Town map; `town_map.places` lists where you can go in. enter takes one by name. press 512 goes to the world map (travel does too).",
     dialog = "In conversation. Keys 1 to 9 choose a reply.",
-    combat = "In combat. attack a critter by id, or end_turn to pass. Keys: n cycles the attack mode, b swaps hands.",
+    combat = "In combat. attack a critter by id: it keeps at it, turn after turn, until the critter dies or something needs your decision. end_turn passes. Keys: n cycles the attack mode, b swaps hands.",
     map = "Exploring the map.",
     inventory = "Inventory screen. You don't need it: the inventory, equip, unequip, reload and use_item tools work from the map. Escape closes it.",
     use_item_on = "Choosing an item to use on something; this still needs the mouse. Escape cancels.",
@@ -133,9 +133,12 @@ end
 -- The living critters around the player, nearest first. In fair play that's
 -- those a player can see on screen (mcp.sight), with health as the examine
 -- text gives it: a word, or exact HP with the Awareness perk. Omniscient mode
--- lists every critter on the elevation with exact HP. In combat each also
--- carries the player's odds against it with the selected attack: the hit
--- chance the game shows on hover, and whether the attack is possible now.
+-- lists every critter on the elevation with exact HP. Each says whether it
+-- will attack (hostile: it's fighting, has been hit by the player's side, or
+-- is a creature that attacks on sight). In combat each also carries the
+-- player's odds against it with the selected attack: the hit chance the game
+-- shows on hover, and whether the attack is possible now. A target out of
+-- range has no hit chance: the game's figure for it means nothing.
 function state.critters(player, in_combat)
     local exact_hp = fo.omniscient() or fo.awareness()
     local list = {}
@@ -148,6 +151,7 @@ function state.critters(player, in_combat)
                 distance = fo.tile_distance(player.tile, critter.tile),
                 direction = DIRECTION_NAMES[fo.tile_direction(player.tile, critter.tile)],
                 health = critter.health,
+                hostile = critter.hostile,
                 knocked_down = critter.knocked_down or nil,
                 crippled = critter.crippled or nil,
                 screen = screen_point(critter.tile),
@@ -159,8 +163,9 @@ function state.critters(player, in_combat)
             end
 
             if in_combat then
-                entry.hostile = critter.hostile
-                entry.hit_chance = critter.hit_chance
+                if critter.why_not ~= "out of range" then
+                    entry.hit_chance = critter.hit_chance
+                end
                 entry.can_attack = critter.can_attack
                 entry.why_not = critter.why_not
             end
@@ -213,6 +218,20 @@ end
 -- state starts from the present rather than replaying history.
 local message_cursor = nil
 
+-- A line from another critter's attack starts by naming the attacker, since
+-- "You were hit for 4 hit points" doesn't say who by. Fair play names only
+-- an attacker the player could see when it attacked.
+local function attributed(line)
+    local attacker = line.attacker
+    if attacker == nil then
+        return line.text
+    end
+    if sight.sees(attacker) then
+        return ("[%s, id %d] %s"):format(attacker.name, attacker.id, line.text)
+    end
+    return "[someone out of sight] " .. line.text
+end
+
 function state.new_messages()
     if message_cursor == nil then
         local _, latest = fo.messages(math.maxinteger)
@@ -224,7 +243,7 @@ function state.new_messages()
 
     local texts = {}
     for i, line in ipairs(lines) do
-        texts[i] = line.text
+        texts[i] = attributed(line)
     end
     return texts
 end

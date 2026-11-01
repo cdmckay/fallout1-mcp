@@ -30,6 +30,7 @@
 #include "game/stat.h"
 #include "game/tile.h"
 #include "game/trait.h"
+#include "mcp/attacks.h"
 #include "mcp/mcp.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
@@ -3674,6 +3675,9 @@ static void damage_object(Object* obj, int damage, bool animated, bool a4)
 // 0x422844
 void combat_display(Attack* attack)
 {
+    // MCP: Names the attacker on these lines for the agent.
+    McpAttack mcpAttack(attack->attacker);
+
     MessageListItem messageListItem;
 
     if (attack->attacker == obj_dude) {
@@ -4778,6 +4782,23 @@ void combat_delete_critter(Object* obj)
 bool combat_is_animating()
 {
     return combat_turn_running > 0;
+}
+
+// MCP: Whether `critter` is taking part in the fight, rather than a bystander
+// who hasn't joined it.
+bool combat_is_combatant(Object* critter)
+{
+    if (!isInCombat()) {
+        return false;
+    }
+
+    for (int index = 0; index < list_com; index++) {
+        if (combat_list[index] == critter) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 } // namespace fallout

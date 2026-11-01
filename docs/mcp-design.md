@@ -112,7 +112,7 @@ Every action tool waits until the game is idle (with a timeout) and then returns
 | Movement | `walk_to(tile, screen point, or direction and distance; run)`; a short walk says why in `stopped_by`, and one a fight stops returns on the player's turn | `register_begin` / `register_object_move_to_tile` / `register_end`, as `gmouse_handle_event` does; in combat, AP is passed and spent per step. A direction walk picks its spot from a breadth-first search over `obj_blocking_at` (`src/mcp/bindings_walk.cc`) |
 | Interaction | `use`, `pick_up`, `look_at`, `use_skill`, `use_item_on`, `loot` | `action_use_an_object`, `action_get_an_object`, `action_use_skill_on`, `action_use_an_item_on_object`, `action_loot_container` |
 | Dialog | `talk(npc)`, `choose(n)`, `barter(...)` | `action_talk_to`; option keys `'1'`–`'9'` (`gdialog.cc:1374`); `'b'` and `'m'` for barter |
-| Combat | `attack(target, mode)`, `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack_this`, `determine_to_hit`, Space and Return |
+| Combat | `attack(target; repeat, end_turn, min_hp)`, which fights a target to the death across turns and says in `stopped_by` what stopped it short; `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack`, `determine_to_hit`, Space and Return |
 | World map | `travel(place or point)`, `enter(place)` | town buttons `500 + town`, town-map places `514 +`, and command codes for a point and the player's marker |
 | Saves | `save(slot)`, `load(slot)` | `SaveSlot`/`LoadSlot` shims |
 | Lifecycle (bridge) | `launch_game`, `quit_game`, `reload_lua`, `eval_lua` (omniscient only) | — |
@@ -127,7 +127,8 @@ The agent should be able to decide from one call. Each mode has a view that retu
 
 The rule: **the agent should never need several calls to learn what a person would see at a glance.** In practice:
 
-- **Each action returns the next decision.** Every action returns the full view for whatever mode it ends in, plus what changed: new messages, HP and AP changes, a change of mode. A combat turn is one call per action, and the agent can go decide → act → decide without separate state calls.
+- **Each action returns the next decision.** Every action returns the full view for whatever mode it ends in, plus what changed: new messages, HP and AP changes, a change of mode. The agent can go decide → act → decide without separate state calls.
+- **An action carries on until there's something to decide (#19).** `attack` keeps at its target until it dies, ending turns as the AP runs out, so a fight with one rat is one call. It stops early, before ending a turn, for whatever the agent should decide on: a hostile critter coming into sight, HP falling low, the weapon running dry, the target out of sight or out of reach. Like a walk's, its result says which (`stopped_by`).
 - **The whole view, not a diff.** The view for the current mode is returned in full each time, kept compact, so the agent never has to piece state together from earlier answers.
 - **Approaching is part of the action.** `talk`, `use`, `pick_up`, `loot` and `use_skill` walk to the target first, as clicking a distant object does in the game. Out of combat, "go and talk to Killian" is one call, not a walk followed by a talk.
 - **Descriptions come with first sight.** The first time an object appears in a view, its look-at description is included, so the agent doesn't have to examine each one. After that it's listed by name.
@@ -149,14 +150,15 @@ This view comes back from every combat action, and from `state` during combat.
   - Armor, and quick-use items such as stimpaks, with their counts.
 - **Each visible critter:**
   - id and name, and distance in hexes (`tile_dist`);
+  - whether it will attack (`hostile`, below), in and out of combat;
   - health, as the examine text would give it (`protinst.cc`): one of five descriptions ("uninjured" down to "almost dead"), or exact HP plus its weapon and ammo if you have the Awareness perk. Omniscient mode always gives exact HP;
   - knocked down or crippled;
   - for each of your attack modes:
-    - hit chance (`determine_to_hit(obj_dude, target, HIT_LOCATION_UNCALLED, mode)`, the same figure the game shows on hover via `combat_to_hit`, `gmouse.cc:726`);
+    - hit chance (`determine_to_hit(obj_dude, target, HIT_LOCATION_UNCALLED, mode)`, the same figure the game shows on hover via `combat_to_hit`, `gmouse.cc:726`), left out for a target out of range, where the figure means nothing;
     - whether the shot is possible right now (`combat_check_bad_shot`: out of range, not enough AP, out of ammo, blocked), and why not;
   - for aimed shots, the chance against each body part (`determine_to_hit` for each `HIT_LOCATION_*`), as the called-shot screen shows;
   - AP needed to get adjacent, for melee.
-- **What happened:** combat messages since the agent's last turn, such as hits, misses, criticals, damage and deaths.
+- **What happened:** combat messages since the agent's last turn, such as hits, misses, criticals, damage and deaths. A line from another critter's attack starts with who made it, `[Cave Rat, id 711] You were hit for 3 hit points.`, which the game's own line leaves out; fair play names only an attacker the player could see when it attacked (`[someone out of sight]` otherwise). `combat_display` records the attacker for each line it prints (`src/mcp/bindings_combat.cc`).
 - **Turn order:** omniscient only. The game shows whose turn it is, not the queue (`combat_list`).
 
 ### Exploration
@@ -189,7 +191,9 @@ Decided: fair play is the default.
 - **Fair play** reports only what a player could see or know: what's visible on screen (below), the player's own stats and inventory, the dialog and message text shown, and visible combat state. There are no script variables, no hidden containers' contents, and no `eval_lua` or raw mouse.
 - **Omniscient** is for debugging. It adds full engine state (every object on the map, global and script variables, hidden inventories), `eval_lua`, `click` and `move_mouse`. It is chosen when the bridge starts (`FALLOUT_MCP_OMNISCIENT=1`), so a playing session can't switch it on by itself. Every result says which mode produced it.
 
-Each state field is tagged fair or omniscient where it is defined in Lua, so the filter is one place, not a check scattered through every tool. Some fields still need a judgement as they are added, for example whether an NPC's hostility shows before combat starts.
+Each state field is tagged fair or omniscient where it is defined in Lua, so the filter is one place, not a check scattered through every tool. Some fields still need a judgement as they are added.
+
+**Hostility (#19), decided:** a critter is `hostile` when it's taking part in the fight (`combat_list`'s combatants), has been hit by the player's side in it (`who_hit_me`), or is a creature that attacks on sight: rats, radscorpions, floaters, centaurs, mantises, deathclaws and the plants, by its kill type, which a player knows on sight. Companions and the dead never are. Whether people, brahmin, dogs and robots will turn on the player before a fight is up to their scripts, which nothing on screen shows, so they aren't hostile until they join one. The rule is `mcp_hostile` (`src/mcp/combat_rules.h`), and the flag rides on the critters that `lua/mcp/sight.lua` lets through.
 
 ### What "visible" means (#20)
 

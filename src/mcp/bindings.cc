@@ -32,6 +32,7 @@
 #include "game/trait.h"
 #include "game/worldmap.h"
 #include "int/movie.h"
+#include "mcp/attacks.h"
 #include "mcp/lua_fields.h"
 #include "mcp/mcp.h"
 #include "mcp/message_log.h"
@@ -434,11 +435,13 @@ void mcp_record_message(const char* text)
 {
     if (text != nullptr) {
         gMessages.add(text);
+        mcp_attribute_message(gMessages.latest());
     }
 }
 
 // fo.messages(after): the message window's lines numbered after `after`, as
-// { seq, text } oldest first, then the newest number.
+// { seq, text, attacker } oldest first, then the newest number. `attacker` is
+// set on the lines of another critter's attack.
 static int fo_messages(lua_State* L)
 {
     long long after = luaL_optinteger(L, 1, 0);
@@ -449,6 +452,7 @@ static int fo_messages(lua_State* L)
         lua_createtable(L, 0, 2);
         set_int(L, "seq", lines[i].first);
         set_string(L, "text", lines[i].second.c_str());
+        mcp_set_message_attacker(L, lines[i].first);
         lua_rawseti(L, -2, static_cast<lua_Integer>(i + 1));
     }
 
@@ -597,7 +601,8 @@ static int fo_critters(lua_State* L)
         set_bool(L, "dead", critter_is_dead(obj));
         set_bool(L, "knocked_down", (obj->data.critter.combat.results & DAM_KNOCKED_DOWN) != 0);
         set_bool(L, "crippled", critter_is_crippled(obj));
-        set_bool(L, "hostile", obj->data.critter.combat.team != obj_dude->data.critter.combat.team);
+        set_bool(L, "hostile", mcp_critter_hostile(obj));
+        set_bool(L, "fighting", combat_is_combatant(obj));
         set_int(L, "hp", stat_level(obj, STAT_CURRENT_HIT_POINTS));
         set_int(L, "max_hp", stat_level(obj, STAT_MAXIMUM_HIT_POINTS));
         set_string(L, "health", health_description(obj));

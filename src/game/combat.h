@@ -58,6 +58,7 @@ int combat_player_knocked_out_by();
 int combat_explode_scenery(Object* a1, Object* a2);
 void combat_delete_critter(Object* obj);
 bool combat_is_animating(); // MCP
+bool combat_is_combatant(Object* critter); // MCP
 
 static inline bool isInCombat()
 {

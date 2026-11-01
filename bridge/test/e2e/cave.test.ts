@@ -2,7 +2,8 @@
 // the game, start a new game with the premade character, and get out of the
 // Vault 13 cave to the world map, fighting the rats on the way, all without
 // the mouse. Before that, a shorter case walks into the rats and checks the
-// fight starts on the player's turn with full AP.
+// fight starts on the player's turn with full AP. The rats show as hostile
+// before any fight, and each one takes a single attack call (#19).
 //
 // It drives the real bridge over stdio against the real game, so it needs a
 // built game and the game data, and runs only when asked:
@@ -122,6 +123,10 @@ test.skipIf(!enabled)(
     expectExplained(view);
     for (let step = 0; step < 20 && view.mode !== "combat"; step++) {
       const rat = (view.critters ?? []).find((critter: View) => critter.screen);
+      // Rats attack on sight, and the list says so before they do.
+      if (rat) {
+        expect(rat.hostile).toBe(true);
+      }
       view = rat ? await call("walk_to", { x: rat.screen.x, y: rat.screen.y }) : await call("walk_to", { direction: "e", distance: 10 });
       expectExplained(view);
     }
@@ -151,15 +156,26 @@ test.skipIf(!enabled)(
       expect(listed.has(Number(id))).toBe(true);
     }
 
-    // Fight whatever attacks; otherwise head for the world-map exit.
-    let fights = 0;
+    // Fight whatever attacks, nearest first; otherwise head for the world-map
+    // exit. Each attack keeps at its rat across turns until it's dead, unless
+    // something comes up that it stops for, and says which.
+    let attacks = 0;
+    let combatCalls = 0;
+    let kills = 0;
+    const hits: string[] = [];
     for (let step = 0; step < 120 && view.mode !== "world_map"; step++) {
+      hits.push(...(view.messages ?? []).filter((line: string) => /\bYou were (critically )?hit\b/.test(line)));
       if (view.mode === "combat") {
-        const combat = view.combat;
+        combatCalls++;
         const target = (view.critters ?? []).find((critter: View) => critter.hostile);
-        if (combat?.your_turn && target && combat.ap >= combat.attack.ap_cost) {
-          view = await call("attack", { target: target.id }).catch(() => call("end_turn"));
-          fights++;
+        if (view.combat?.your_turn && target) {
+          await call("show_status", { text: `one attack call on rat ${target.id}: it should fight on until the rat dies` });
+          view = await call("attack", { target: target.id });
+          attacks++;
+          expect(view.attacks.target_dead || view.attacks.stopped_by !== undefined).toBe(true);
+          if (view.attacks.target_dead) {
+            kills++;
+          }
         } else {
           view = await call("end_turn");
         }
@@ -176,7 +192,16 @@ test.skipIf(!enabled)(
     expect(view.mode).toBe("world_map");
     expect(view.player.hp).toBeGreaterThan(0);
     // The cave has rats; getting out means having dealt with some.
-    expect(fights).toBeGreaterThan(0);
+    console.log(`cave fight: ${attacks} attack calls and ${combatCalls} calls in combat for ${kills} rats`);
+    expect(kills).toBeGreaterThan(0);
+    // Before #19 a rat cost an attack and an end_turn per swing, 6 to 11
+    // calls for the 3 rats on the way out; now it's one call each, give or
+    // take one that stopped for something.
+    expect(combatCalls).toBeLessThanOrEqual(kills + 2);
+    // Damage taken names the rat that did it.
+    for (const line of hits) {
+      expect(line).toMatch(/^\[[A-Za-z ]*Rat, id \d+\] /);
+    }
   },
   180_000,
 );
