@@ -310,4 +310,27 @@ function tests.results_can_carry_text_and_an_image()
     equal(content[2].mimeType, "image/png", "mime type")
 end
 
+
+-- show_status puts one tidy line in the window title, and an empty one clears it.
+function tests.show_status_puts_one_line_in_the_window_title()
+    local core, engine = support.new()
+    local shown = {}
+    fo.set_status = function(text)
+        shown[#shown + 1] = text
+    end
+    require("tools.basic")(core)
+
+    engine.request({ id = 1, op = "call", tool = "show_status", args = { text = "  walking into\nthe rats  " } })
+    engine.frames(1)
+    local reply = engine.reply()
+    assert(reply.result, reply.error and reply.error.message)
+    equal(shown[1], "walking into the rats", "shown")
+    equal(json.decode(reply.result.content[1].text).status, "walking into the rats", "result")
+
+    engine.request({ id = 2, op = "call", tool = "show_status", args = { text = "" } })
+    engine.frames(1)
+    engine.reply()
+    equal(shown[2], "", "cleared")
+end
+
 return tests

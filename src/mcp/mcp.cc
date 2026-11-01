@@ -27,6 +27,12 @@ static bool gMcpOmniscient = false;
 
 // Whether the view follows the player; FALLOUT_MCP_FOLLOW=0 turns it off.
 static bool gMcpFollow = true;
+
+// The window title before any status: the game's own, plus what this game is
+// for (FALLOUT_MCP_TITLE), if anything. See `fo_set_status`.
+static std::string gMcpBaseTitle;
+static bool gMcpTitleLabelled = false;
+
 static std::string gMcpScriptDir;
 static std::unique_ptr<LuaHost> gMcpLua;
 static SocketServer gMcpSocket;
@@ -123,6 +129,22 @@ static int fo_turbo(lua_State* L)
     return 1;
 }
 
+// fo.set_status(text): shows what the agent is doing in the window title, after
+// the game's label, for whoever is watching ("FALLOUT - walking: into the
+// rats"). An empty text leaves just the label.
+static int fo_set_status(lua_State* L)
+{
+    const char* status = luaL_checkstring(L, 1);
+
+    std::string title = gMcpBaseTitle;
+    if (*status != '\0') {
+        title += gMcpTitleLabelled ? ": " : " - ";
+        title += status;
+    }
+    win_set_minimized_title(title.c_str());
+    return 0;
+}
+
 // fo.reload(id): reruns the Lua scripts once the current call returns, then
 // answers request `id`.
 static int fo_reload(lua_State* L)
@@ -139,6 +161,7 @@ static void mcp_register_bindings(lua_State* L)
         { "ticks", fo_ticks },
         { "omniscient", fo_omniscient },
         { "turbo", fo_turbo },
+        { "set_status", fo_set_status },
         { "reload", fo_reload },
         { nullptr, nullptr },
     };
@@ -234,7 +257,9 @@ bool mcp_init()
         snprintf(title, sizeof(title), "%s - %s", GNW95_title, label);
         win_set_minimized_title(title);
         mcp_log("window title: %s", title);
+        gMcpTitleLabelled = true;
     }
+    gMcpBaseTitle = GNW95_title;
 
     gMcpEnabled = true;
     mcp_log("%s on %s, %s mode, %ux speed%s", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale(), gMcpFollow ? ", following the player" : "");

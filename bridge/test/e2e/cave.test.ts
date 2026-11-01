@@ -75,10 +75,10 @@ afterAll(async () => {
 });
 
 // Starts the game afresh and a new game with the premade character, which
-// begins in the Vault 13 cave.
-async function newGame(): Promise<View> {
+// begins in the Vault 13 cave. The window title says `what` the test checks.
+async function newGame(what: string): Promise<View> {
   await call("quit_game").catch(() => {});
-  const launched = await call("launch_game");
+  const launched = await call("launch_game", { purpose: `e2e: ${what}` });
   expect(launched).toContain("omniscient mode");
   expect((await call("ping")).turbo).toBe(8);
 
@@ -114,7 +114,7 @@ function expectExplained(view: View) {
 test.skipIf(!enabled)(
   "walks into the cave rats and gets its turn with full AP",
   async () => {
-    let view = await newGame();
+    let view = await newGame("walks into the cave rats and gets its turn with full AP");
 
     // East along the cave, where the play test's walk ran into the rats,
     // then straight at the nearest rat until one starts a fight.
@@ -137,7 +137,7 @@ test.skipIf(!enabled)(
 test.skipIf(!enabled)(
   "leaves the Vault 13 cave without the mouse",
   async () => {
-    let view = await newGame();
+    let view = await newGame("leaves the Vault 13 cave without the mouse");
 
     // The text map: the player among the cave's walls and floor, and each
     // critter on it keyed to one in the critter list.

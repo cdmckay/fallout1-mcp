@@ -22,9 +22,11 @@ afterEach(() => {
 class FakeLauncher implements Launcher {
   starts = 0;
   stops = 0;
+  titles: (string | undefined)[] = [];
   constructor(readonly game: FakeEngine) {}
-  async start() {
+  async start(title?: string) {
     this.starts++;
+    this.titles.push(title);
     this.game.start();
   }
   async stop() {
@@ -93,6 +95,22 @@ test("launch_game starts the game, lists its tools and announces the change", as
   expect(names((await client.listTools()).tools)).toContain("ping");
   await Bun.sleep(10);
   expect(listChanges()).toBe(1);
+});
+
+test("launch_game's purpose goes to the window title, on one line", async () => {
+  const { client, launcher } = await setup({ running: false });
+
+  await client.callTool({ name: "launch_game", arguments: { purpose: "  Checking what happens when I click\non the world map " } });
+
+  expect(launcher.titles).toEqual(["Checking what happens when I click on the world map"]);
+});
+
+test("launch_game without a purpose keeps the configured title", async () => {
+  const { client, launcher } = await setup({ running: false });
+
+  await client.callTool({ name: "launch_game", arguments: {} });
+
+  expect(launcher.titles).toEqual([undefined]);
 });
 
 test("launch_game leaves a running game alone", async () => {

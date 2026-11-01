@@ -19,7 +19,7 @@ It does all of this without the mouse. Each play test turns what tripped the age
 
 | Area | Tools |
 | --- | --- |
-| The game | `launch_game`, `quit_game`, `reload_lua`, `ping` |
+| The game | `launch_game` (with a purpose for the window title), `quit_game`, `reload_lua`, `ping`, `show_status` (what you're doing, in the window title) |
 | Seeing | `state` (the current screen, its keys, and what's going on), `look` (the same, plus a screenshot and a text map of what's on screen), `survey` (looks around without moving) |
 | Input | `key` (keys, as the player presses them), `press` (on-screen buttons that have no key) |
 | Moving | `walk_to` (a tile, a point on the screenshot or a direction) |

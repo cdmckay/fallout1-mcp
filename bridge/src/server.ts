@@ -14,8 +14,19 @@ const NO_ARGUMENTS = { type: "object", properties: {}, additionalProperties: fal
 const BRIDGE_TOOLS: Tool[] = [
   {
     name: "launch_game",
-    description: "Starts Fallout and waits until it's ready. The game's own tools appear once it's running.",
-    inputSchema: NO_ARGUMENTS,
+    description:
+      "Starts Fallout and waits until it's ready. The game's own tools appear once it's running. Say what you're opening it for in purpose: the window title shows it, so whoever is watching knows what this game is for.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        purpose: {
+          type: "string",
+          maxLength: 120,
+          description: 'What this game is for, e.g. "play test: from the cave to the world map" or "checking that walk_to stops at walls".',
+        },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "quit_game",
@@ -90,7 +101,7 @@ export class Bridge {
   async callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
     switch (name) {
       case "launch_game":
-        return this.#launch();
+        return this.#launch(typeof args.purpose === "string" ? args.purpose : undefined);
       case "quit_game":
         return this.#quit();
       case "reload_lua":
@@ -131,14 +142,17 @@ export class Bridge {
     }
   }
 
-  async #launch(): Promise<CallToolResult> {
+  async #launch(purpose: string | undefined): Promise<CallToolResult> {
     if (await this.engine.connect()) {
       await this.refreshTools();
       return text(`The game is already running (${this.#access} mode). ${this.#describeTools()}`);
     }
 
+    // One line, as a window title shows it.
+    const title = purpose?.replace(/\s+/g, " ").trim() || undefined;
+
     try {
-      await this.launcher.start();
+      await this.launcher.start(title);
     } catch (error) {
       return text(`Couldn't start the game: ${errorMessage(error)}`, true);
     }

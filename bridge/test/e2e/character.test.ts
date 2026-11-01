@@ -73,7 +73,7 @@ afterAll(async () => {
 test.skipIf(!enabled)(
   "reads Max Stone's sheet and spends a level-up without the mouse",
   async () => {
-    await call("launch_game");
+    await call("launch_game", { purpose: "e2e: reads Max Stone's sheet and spends a level-up without the mouse" });
 
     let view = await call("state");
     for (let i = 0; i < 4 && view.mode === "movie"; i++) {

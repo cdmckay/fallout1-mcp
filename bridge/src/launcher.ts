@@ -6,7 +6,9 @@ import type { Config } from "./config";
 
 // Starts and stops the game.
 export interface Launcher {
-  start(): Promise<void>;
+  // `title` says what the game is for, in its window title; it replaces the
+  // configured one (Config.title).
+  start(title?: string): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -15,7 +17,7 @@ export function createLauncher(config: Config): Launcher {
 }
 
 // The environment that turns MCP on in the game.
-function mcpEnvironment(config: Config): Record<string, string> {
+function mcpEnvironment(config: Config, title = config.title): Record<string, string> {
   const env: Record<string, string> = {
     FALLOUT_MCP_SOCKET: config.socketPath,
     FALLOUT_MCP_LUA: config.luaDir,
@@ -26,8 +28,8 @@ function mcpEnvironment(config: Config): Record<string, string> {
   if (config.turbo > 1) {
     env.FALLOUT_MCP_TURBO = String(config.turbo);
   }
-  if (config.title !== undefined) {
-    env.FALLOUT_MCP_TITLE = config.title;
+  if (title !== undefined) {
+    env.FALLOUT_MCP_TITLE = title;
   }
   return env;
 }
@@ -73,7 +75,7 @@ class SystemdLauncher implements Launcher {
     };
   }
 
-  async start(): Promise<void> {
+  async start(title?: string): Promise<void> {
     await prepare(this.config);
 
     const { unit } = this.config;
@@ -81,7 +83,7 @@ class SystemdLauncher implements Launcher {
       throw new Error(`The ${unit} unit is already running, but its game isn't answering on ${this.config.socketPath}. Stop it with quit_game first.`);
     }
 
-    const setenv = Object.entries(mcpEnvironment(this.config)).map(([key, value]) => `--setenv=${key}=${value}`);
+    const setenv = Object.entries(mcpEnvironment(this.config, title)).map(([key, value]) => `--setenv=${key}=${value}`);
     const { code, output } = await run(
       ["systemd-run", "--user", `--unit=${unit}`, "--collect", `--working-directory=${this.config.dataDir}`, ...setenv, "--", this.config.binary],
       this.#env,
@@ -103,7 +105,7 @@ class DirectLauncher implements Launcher {
 
   constructor(readonly config: Config) {}
 
-  async start(): Promise<void> {
+  async start(title?: string): Promise<void> {
     await prepare(this.config);
 
     if (this.#process !== null && this.#process.exitCode === null) {
@@ -113,7 +115,7 @@ class DirectLauncher implements Launcher {
     // The game's log goes to the bridge's stderr, which MCP clients keep.
     this.#process = Bun.spawn([this.config.binary], {
       cwd: this.config.dataDir,
-      env: { ...process.env, ...mcpEnvironment(this.config) },
+      env: { ...process.env, ...mcpEnvironment(this.config, title) },
       stdin: "ignore",
       stdout: "ignore",
       stderr: "inherit",
