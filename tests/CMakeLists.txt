@@ -14,6 +14,7 @@ add_executable(mcp_tests
     "mcp/lua_host_test.cc"
     "mcp/message_log_test.cc"
     "mcp/png_test.cc"
+    "mcp/scaled_clock_test.cc"
     "mcp/socket_server_test.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/line_buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/lua_host.cc"

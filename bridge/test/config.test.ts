@@ -47,6 +47,14 @@ test("a missing XDG_RUNTIME_DIR falls back to the user's runtime directory", () 
   expect(config.socketPath.startsWith(config.runtimeDir)).toBe(true);
 });
 
+test("turbo defaults to normal speed and accepts 1 to 16", () => {
+  expect(loadConfig({}).turbo).toBe(1);
+  expect(loadConfig({ FALLOUT_MCP_TURBO: "8" }).turbo).toBe(8);
+  expect(() => loadConfig({ FALLOUT_MCP_TURBO: "0" })).toThrow(/1 to 16/);
+  expect(() => loadConfig({ FALLOUT_MCP_TURBO: "17" })).toThrow(/1 to 16/);
+  expect(() => loadConfig({ FALLOUT_MCP_TURBO: "fast" })).toThrow(/1 to 16/);
+});
+
 test("an unknown launcher is rejected", () => {
   expect(() => loadConfig({ FALLOUT_MCP_LAUNCHER: "docker" })).toThrow(/systemd.*direct/);
 });

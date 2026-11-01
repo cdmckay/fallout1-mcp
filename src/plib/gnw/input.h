@@ -33,6 +33,8 @@ void dump_screen();
 int default_screendump(int width, int height, unsigned char* data, unsigned char* palette);
 void register_screendump(int new_screendump_key, ScreenDumpFunc* new_screendump_func);
 unsigned int get_time();
+void set_time_scale(unsigned int factor); // MCP
+unsigned int get_time_scale(); // MCP
 void pause_for_tocks(unsigned int ms);
 void block_for_tocks(unsigned int ms);
 unsigned int elapsed_time(unsigned int a1);

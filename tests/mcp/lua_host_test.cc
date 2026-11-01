@@ -55,6 +55,12 @@ int fake_window_focused(lua_State* L)
     return 1;
 }
 
+int fake_turbo(lua_State* L)
+{
+    lua_pushinteger(L, 1);
+    return 1;
+}
+
 // The `fo` table the engine installs, with fakes for the engine state.
 void register_fake_bindings(lua_State* L)
 {
@@ -65,6 +71,7 @@ void register_fake_bindings(lua_State* L)
         { "omniscient", fake_omniscient },
         { "reload", fake_reload },
         { "window_focused", fake_window_focused },
+        { "turbo", fake_turbo },
         { nullptr, nullptr },
     };
     luaL_newlib(L, functions);

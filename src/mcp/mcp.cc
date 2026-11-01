@@ -16,6 +16,7 @@
 #include "mcp/lua_host.h"
 #include "mcp/socket_server.h"
 #include "plib/gnw/debug.h"
+#include "plib/gnw/input.h"
 
 namespace fallout {
 
@@ -110,6 +111,13 @@ static int fo_omniscient(lua_State* L)
     return 1;
 }
 
+// fo.turbo(): how many times faster than real time the game runs (1 normally).
+static int fo_turbo(lua_State* L)
+{
+    lua_pushinteger(L, get_time_scale());
+    return 1;
+}
+
 // fo.reload(id): reruns the Lua scripts once the current call returns, then
 // answers request `id`.
 static int fo_reload(lua_State* L)
@@ -125,6 +133,7 @@ static void mcp_register_bindings(lua_State* L)
         { "log", fo_log },
         { "ticks", fo_ticks },
         { "omniscient", fo_omniscient },
+        { "turbo", fo_turbo },
         { "reload", fo_reload },
         { nullptr, nullptr },
     };
@@ -197,8 +206,20 @@ bool mcp_init()
         return false;
     }
 
+    // Turbo mode, for development: the engine's clock runs this many times
+    // faster than real time.
+    const char* turbo = getenv("FALLOUT_MCP_TURBO");
+    if (turbo != nullptr && *turbo != '\0') {
+        int factor = atoi(turbo);
+        if (factor >= 1 && factor <= 16) {
+            set_time_scale(static_cast<unsigned int>(factor));
+        } else {
+            mcp_log("FALLOUT_MCP_TURBO must be 1 to 16, not \"%s\"; running at normal speed", turbo);
+        }
+    }
+
     gMcpEnabled = true;
-    mcp_log("%s on %s, %s mode", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair");
+    mcp_log("%s on %s, %s mode, %ux speed", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale());
     return true;
 }
 

@@ -13,6 +13,7 @@
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/intrface.h"
 #include "plib/gnw/memory.h"
+#include "plib/gnw/scaled_clock.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include "plib/gnw/touch.h"
@@ -646,10 +647,30 @@ void register_screendump(int new_screendump_key, ScreenDumpFunc* new_screendump_
     screendump_func = new_screendump_func;
 }
 
+// MCP: Real time unless turbo mode speeds it up; see `set_time_scale`.
+static ScaledClock gnw_clock;
+
 // 0x4B3BB8
 unsigned int get_time()
 {
-    return SDL_GetTicks();
+    return gnw_clock.at(SDL_GetTicks());
+}
+
+// MCP: Runs the engine's clock `factor` times faster than real time, for
+// development, and lets the frame rate rise with it so animations that step
+// once a frame keep up. Movies and sound keep real time.
+void set_time_scale(unsigned int factor)
+{
+    if (factor < 1) {
+        factor = 1;
+    }
+    gnw_clock.setFactor(factor, SDL_GetTicks());
+    sharedFpsLimiter.setFps(60 * factor);
+}
+
+unsigned int get_time_scale()
+{
+    return gnw_clock.factor();
 }
 
 // 0x4B3BC4
@@ -674,7 +695,8 @@ void pause_for_tocks(unsigned int delay)
 // 0x4B3C00
 void block_for_tocks(unsigned int ms)
 {
-    unsigned int start = SDL_GetTicks();
+    // MCP: The engine's clock, like `elapsed_time` below.
+    unsigned int start = get_time();
     unsigned int diff;
     do {
         // NOTE: Uninline
@@ -685,7 +707,9 @@ void block_for_tocks(unsigned int ms)
 // 0x4B3C28
 unsigned int elapsed_time(unsigned int start)
 {
-    unsigned int end = SDL_GetTicks();
+    // MCP: The engine's clock rather than SDL's, so a time taken with
+    // `get_time` and measured here agree in turbo mode.
+    unsigned int end = get_time();
 
     // NOTE: Uninline.
     return elapsed_tocks(end, start);

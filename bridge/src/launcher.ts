@@ -23,6 +23,9 @@ function mcpEnvironment(config: Config): Record<string, string> {
   if (config.omniscient) {
     env.FALLOUT_MCP_OMNISCIENT = "1";
   }
+  if (config.turbo > 1) {
+    env.FALLOUT_MCP_TURBO = String(config.turbo);
+  }
   return env;
 }
 

@@ -19,6 +19,9 @@ export interface Config {
   // Omniscient mode, fixed for the bridge's lifetime so a playing agent
   // can't switch it on.
   omniscient: boolean;
+  // Turbo mode, for development: the game runs this many times faster than
+  // real time (1 to 16; 1 is normal speed).
+  turbo: number;
   // "systemd" runs the game as a transient user unit (Linux); "direct"
   // spawns it as a child process.
   launcher: "systemd" | "direct";
@@ -39,6 +42,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`FALLOUT_MCP_LAUNCHER must be "systemd" or "direct", not "${launcher}"`);
   }
 
+  const turbo = Number(env.FALLOUT_MCP_TURBO ?? 1);
+  if (!Number.isInteger(turbo) || turbo < 1 || turbo > 16) {
+    throw new Error(`FALLOUT_MCP_TURBO must be a whole number from 1 to 16, not "${env.FALLOUT_MCP_TURBO}"`);
+  }
+
   return {
     runtimeDir,
     socketPath: env.FALLOUT_MCP_SOCKET ?? join(runtimeDir, "fallout1-mcp", "game.sock"),
@@ -46,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     binary: env.FALLOUT_BINARY ?? join(repo, "build", "fallout-ce"),
     dataDir: env.FALLOUT_DATA_DIR ?? join(homedir(), ".local", "share", "fallout1-mcp"),
     omniscient: env.FALLOUT_MCP_OMNISCIENT === "1",
+    turbo,
     launcher: launcher ?? (process.platform === "linux" && Bun.which("systemd-run") ? "systemd" : "direct"),
     unit: env.FALLOUT_MCP_UNIT ?? "fallout1-mcp",
     requestTimeoutMs: Number(env.FALLOUT_MCP_TIMEOUT_MS ?? 120_000),

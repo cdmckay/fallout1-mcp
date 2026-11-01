@@ -269,6 +269,7 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/platform_compat.h"
     "src/pointer_registry.cc"
     "src/pointer_registry.h"
+    "src/plib/gnw/scaled_clock.h"
     "src/plib/gnw/touch.cc"
     "src/plib/gnw/touch.h"
 )

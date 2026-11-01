@@ -9,8 +9,11 @@ public:
     void mark();
     void throttle() const;
 
+    // MCP: For turbo mode, which runs the game faster than real time.
+    void setFps(unsigned int fps);
+
 private:
-    const unsigned int _fps;
+    unsigned int _fps;
     unsigned int _ticks;
 };
 
