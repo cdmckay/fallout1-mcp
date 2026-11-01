@@ -43,6 +43,28 @@ MCP is off unless the game starts with these set:
 
 The protocol is one JSON object per line, each answered once by id. `{"id":1,"op":"list"}` lists the tools, `{"id":2,"op":"call","tool":"ping","args":{}}` calls one, and `{"id":3,"op":"reload"}` reruns the Lua files in the live game. A reload doesn't need a rebuild or a restart, but it does reset Lua's state.
 
+### The bridge
+
+`bridge/` is the MCP server Claude Code talks to: TypeScript on bun, using `@modelcontextprotocol/sdk`, over stdio. It asks the game for its tools and forwards calls to it one at a time. It adds three tools of its own:
+
+- `launch_game`: on Linux through `systemd-run --user`, as above;
+- `quit_game`;
+- `reload_lua`.
+
+Register it with Claude Code:
+
+```bash
+claude mcp add fallout -- bun /home/cdmckay/Code/fallout1-mcp/bridge/src/main.ts
+```
+
+`bridge/src/config.ts` lists the environment it reads. Each setting defaults to this repo's layout. `FALLOUT_MCP_OMNISCIENT=1` selects omniscient mode, and it can only be set when the bridge starts.
+
+```bash
+cd bridge && bun install && bun test && bunx tsc --noEmit
+```
+
+The tests run against a fake game that speaks the real socket protocol, and through the SDK's in-memory client.
+
 ## Game data
 
 The game data is Interplay's and never goes in this repo. The engine needs the original `master.dat`, `critter.dat` and `data/` directory, and it reads `fallout.cfg` and `f1_res.ini` from its working directory. Lookups are case-insensitive, so Steam's upper-case `MASTER.DAT` and `DATA/` work as they are.

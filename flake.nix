@@ -24,6 +24,8 @@
               pkgs.cmake
               pkgs.SDL2
               pkgs.git
+              # The MCP bridge (bridge/) runs on bun.
+              pkgs.bun
             ];
 
             # The engine passes non-literal format strings, which nixpkgs'
