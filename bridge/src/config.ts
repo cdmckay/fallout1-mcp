@@ -27,6 +27,10 @@ export interface Config {
   launcher: "systemd" | "direct";
   // The systemd unit name, for the systemd launcher.
   unit: string;
+  // What this game is for, added to its window title so games running side by
+  // side can be told apart. Defaults to the unit's name without its
+  // "fallout1-mcp-" prefix; the plain fallout1-mcp unit gets none.
+  title: string | undefined;
   // How long one tool call may take before the bridge gives up on it.
   requestTimeoutMs: number;
   // How long the game may take to start listening after launch.
@@ -47,6 +51,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`FALLOUT_MCP_TURBO must be a whole number from 1 to 16, not "${env.FALLOUT_MCP_TURBO}"`);
   }
 
+  const unit = env.FALLOUT_MCP_UNIT ?? "fallout1-mcp";
+  const title = env.FALLOUT_MCP_TITLE || (unit === "fallout1-mcp" ? undefined : unit.replace(/^fallout1-mcp-/, ""));
+
   return {
     runtimeDir,
     socketPath: env.FALLOUT_MCP_SOCKET ?? join(runtimeDir, "fallout1-mcp", "game.sock"),
@@ -56,7 +63,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     omniscient: env.FALLOUT_MCP_OMNISCIENT === "1",
     turbo,
     launcher: launcher ?? (process.platform === "linux" && Bun.which("systemd-run") ? "systemd" : "direct"),
-    unit: env.FALLOUT_MCP_UNIT ?? "fallout1-mcp",
+    unit,
+    title,
     requestTimeoutMs: Number(env.FALLOUT_MCP_TIMEOUT_MS ?? 120_000),
     startupTimeoutMs: Number(env.FALLOUT_MCP_STARTUP_TIMEOUT_MS ?? 60_000),
   };

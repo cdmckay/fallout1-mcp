@@ -26,6 +26,9 @@ function mcpEnvironment(config: Config): Record<string, string> {
   if (config.turbo > 1) {
     env.FALLOUT_MCP_TURBO = String(config.turbo);
   }
+  if (config.title !== undefined) {
+    env.FALLOUT_MCP_TITLE = config.title;
+  }
   return env;
 }
 

@@ -16,7 +16,9 @@
 #include "mcp/lua_host.h"
 #include "mcp/socket_server.h"
 #include "plib/gnw/debug.h"
+#include "plib/gnw/gnw.h"
 #include "plib/gnw/input.h"
+#include "plib/gnw/winmain.h"
 
 namespace fallout {
 
@@ -223,6 +225,16 @@ bool mcp_init()
 
     const char* follow = getenv("FALLOUT_MCP_FOLLOW");
     gMcpFollow = follow == nullptr || strcmp(follow, "0") != 0;
+
+    // What this game is for, in its window title ("FALLOUT - walking"), so
+    // games running side by side can be told apart.
+    const char* label = getenv("FALLOUT_MCP_TITLE");
+    if (label != nullptr && *label != '\0') {
+        char title[sizeof(GNW95_title)];
+        snprintf(title, sizeof(title), "%s - %s", GNW95_title, label);
+        win_set_minimized_title(title);
+        mcp_log("window title: %s", title);
+    }
 
     gMcpEnabled = true;
     mcp_log("%s on %s, %s mode, %ux speed%s", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale(), gMcpFollow ? ", following the player" : "");

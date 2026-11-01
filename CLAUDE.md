@@ -42,6 +42,7 @@ MCP is off unless the game starts with these set:
 - `FALLOUT_MCP_OMNISCIENT=1`: optional, for omniscient mode.
 - `FALLOUT_MCP_TURBO=<1..16>`: optional, for development. The engine's clock (`get_time`, a `ScaledClock`) runs that many times faster, and the frame limiter rises with it. Movies and sound keep real time.
 - `FALLOUT_MCP_FOLLOW=0`: optional. By default the view recenters on the player whenever they move, so someone watching can follow the agent. A view panned with the arrow keys stays put until the player moves.
+- `FALLOUT_MCP_TITLE=<label>`: optional. Adds what the game is for to its window title (`FALLOUT - walking`), so games side by side can be told apart. The bridge sets it from its unit's name unless it's given (see below).
 
 The protocol is one JSON object per line, each answered once by id. `{"id":1,"op":"list"}` lists the tools, `{"id":2,"op":"call","tool":"ping","args":{}}` calls one, and `{"id":3,"op":"reload"}` reruns the Lua files in the live game. A reload doesn't need a rebuild or a restart, but it does reset Lua's state.
 
@@ -120,7 +121,7 @@ FALLOUT_MCP_UNIT=fallout1-mcp-<name> \
   bun bridge/src/main.ts   # or the e2e test, or a script driving the bridge
 ```
 
-On mango's btrfs the reflink copy is instant and takes no extra space. It also keeps each game's saves and `fallout.cfg` apart. Claude Code's Bash calls don't keep exported variables, so set the three on every command that starts a bridge. The e2e test names its game after `FALLOUT_MCP_UNIT`, so it doesn't collide either.
+On mango's btrfs the reflink copy is instant and takes no extra space. It also keeps each game's saves and `fallout.cfg` apart. The window title shows the unit's name without its `fallout1-mcp-` prefix (`FALLOUT - <name>`), and `FALLOUT_MCP_TITLE` replaces it with anything more telling. Claude Code's Bash calls don't keep exported variables, so set the three on every command that starts a bridge. The e2e test names its game after `FALLOUT_MCP_UNIT`, so it doesn't collide either.
 
 The plain `fallout1-mcp` unit and data directory belong to Cameron and the play tests. Never stop or reuse them from a worktree.
 

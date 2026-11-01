@@ -55,6 +55,14 @@ test("turbo defaults to normal speed and accepts 1 to 16", () => {
   expect(() => loadConfig({ FALLOUT_MCP_TURBO: "fast" })).toThrow(/1 to 16/);
 });
 
+test("the window title's label comes from the unit unless given", () => {
+  expect(loadConfig({}).title).toBeUndefined();
+  expect(loadConfig({ FALLOUT_MCP_UNIT: "fallout1-mcp-walking" }).title).toBe("walking");
+  expect(loadConfig({ FALLOUT_MCP_UNIT: "fallout1-mcp-walking-e2e" }).title).toBe("walking-e2e");
+  expect(loadConfig({ FALLOUT_MCP_UNIT: "my-game" }).title).toBe("my-game");
+  expect(loadConfig({ FALLOUT_MCP_TITLE: "play test 3" }).title).toBe("play test 3");
+});
+
 test("an unknown launcher is rejected", () => {
   expect(() => loadConfig({ FALLOUT_MCP_LAUNCHER: "docker" })).toThrow(/systemd.*direct/);
 });
