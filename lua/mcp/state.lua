@@ -32,6 +32,48 @@ local HINTS = {
     other = "A screen the state view doesn't know yet. Use look to see it.",
 }
 
+local DIRECTION_NAMES = { [0] = "ne", "e", "se", "sw", "w", "nw" }
+
+-- The ways off this map. Exit grids are invisible in play, but a player sees
+-- where a path leaves the map, so in fair play an exit counts once its tile is
+-- on screen or has been seen; omniscient mode lists them all. Each
+-- destination is listed once, at its nearest tile, nearest first.
+function state.exits(player)
+    local omniscient = fo.omniscient()
+    local nearest = {}
+
+    for _, exit in ipairs(fo.exits()) do
+        if omniscient or exit.seen or fo.tile_center(exit.tile) ~= nil then
+            local distance = fo.tile_distance(player.tile, exit.tile)
+            local best = nearest[exit.map]
+            if best == nil or distance < best.distance then
+                nearest[exit.map] = { map = exit.map, tile = exit.tile, distance = distance }
+            end
+        end
+    end
+
+    local list = {}
+    for _, exit in pairs(nearest) do
+        list[#list + 1] = exit
+    end
+    table.sort(list, function(a, b)
+        return a.distance < b.distance
+    end)
+
+    for i, exit in ipairs(list) do
+        local x, y = fo.tile_center(exit.tile)
+        list[i] = {
+            to = fo.map_name(exit.map),
+            tile = exit.tile,
+            distance = exit.distance,
+            direction = DIRECTION_NAMES[fo.tile_direction(player.tile, exit.tile)],
+            screen = x ~= nil and { x = x, y = y } or nil,
+        }
+    end
+
+    return list
+end
+
 function state.mode(flags)
     for _, screen in ipairs(SCREENS) do
         if flags[screen.flag] then
@@ -43,11 +85,27 @@ end
 
 function state.view()
     local mode = state.mode(fo.flags())
-    return {
+    local player = fo.player()
+
+    -- Where the player is on the screenshot, to aim screen-point moves from.
+    if player ~= nil and mode ~= "world_map" then
+        local x, y = fo.tile_center(player.tile)
+        if x ~= nil then
+            player.screen = { x = x, y = y }
+        end
+    end
+
+    local view = {
         mode = mode,
         hint = HINTS[mode],
-        player = fo.player(),
+        player = player,
     }
+
+    if player ~= nil and (mode == "map" or mode == "combat") then
+        view.exits = state.exits(player)
+    end
+
+    return view
 end
 
 return state

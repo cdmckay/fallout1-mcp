@@ -11,6 +11,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. package.path
 local files = {
     "tests.core_test",
     "tests.input_test",
+    "tests.movement_test",
     "tests.state_test",
 }
 
