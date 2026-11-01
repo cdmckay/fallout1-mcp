@@ -109,7 +109,7 @@ Every action tool waits until the game is idle (with a timeout) and then returns
 | Perception | `look` (screenshot + summary), `state`, `objects`, `inventory`, `character`, `messages` | mode flags: `in_main_menu`, `isInCombat()`, `dialog_active()`, world map and screen window ids; `obj_find_first_at`; `tile_coord` (+16, +8 for the hex centre); `object_name`; `stat_level` and `skill_level`; the message log |
 | Keys | `key(name)` | `GNW_add_input_buffer`, `kb_simulate_key` |
 | Raw mouse (omniscient only) | `click(x, y, button)`, `move_mouse(x, y)` | virtual pointer |
-| Movement | `walk_to(tile or object, run)` | `register_begin` / `register_object_move_to_tile` / `register_end`, as `gmouse_handle_event` does; in combat, AP is passed and spent per step |
+| Movement | `walk_to(tile, screen point, or direction and distance; run)`; a short walk says why in `stopped_by`, and one a fight stops returns on the player's turn | `register_begin` / `register_object_move_to_tile` / `register_end`, as `gmouse_handle_event` does; in combat, AP is passed and spent per step. A direction walk picks its spot from a breadth-first search over `obj_blocking_at` (`src/mcp/bindings_walk.cc`) |
 | Interaction | `use`, `pick_up`, `look_at`, `use_skill`, `use_item_on`, `loot` | `action_use_an_object`, `action_get_an_object`, `action_use_skill_on`, `action_use_an_item_on_object`, `action_loot_container` |
 | Dialog | `talk(npc)`, `choose(n)`, `barter(...)` | `action_talk_to`; option keys `'1'`–`'9'` (`gdialog.cc:1374`); `'b'` and `'m'` for barter |
 | Combat | `attack(target, mode)`, `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack_this`, `determine_to_hit`, Space and Return |

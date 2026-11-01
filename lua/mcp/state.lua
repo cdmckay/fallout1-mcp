@@ -248,6 +248,15 @@ function state.mode(flags)
     return "other"
 end
 
+-- Whether the last view showed a fight. Every view goes to the agent, so a
+-- fight going on that the last view didn't show is one the agent doesn't
+-- know about yet, and a walk mustn't spend its AP.
+local showed_fight = false
+
+function state.showed_fight()
+    return showed_fight
+end
+
 function state.view()
     local mode = state.mode(fo.flags())
     local player = fo.player()
@@ -279,6 +288,7 @@ function state.view()
             view.hint = ("In combat, and it's %s's turn. end_turn waits for yours; your AP refills to %d when it starts."):format(view.combat.turn or "someone else", view.combat.max_ap or 0)
         end
     end
+    showed_fight = view.combat ~= nil
 
     if player ~= nil and (mode == "map" or mode == "combat") then
         view.equipped = fo.equipped()
