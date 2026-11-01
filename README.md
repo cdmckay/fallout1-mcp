@@ -1,117 +1,89 @@
-# Fallout Community Edition
+# Fallout MCP
 
-> **This is fallout1-mcp, a modified version of [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce).** It is being adapted so that an agent can play the game through a Lua interface and an MCP server. The changes are in this repository's commit history, and it is distributed under the same [license](LICENSE.md).
+> **This is Fallout MCP (fallout1-mcp), a modified version of [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce).** It adds a Lua interface inside the engine and an MCP server on top of it, so that an agent can play the game. The changes are in this repository's commit history, and it is distributed under the same [license](LICENSE.md).
 
-Fallout Community Edition is a fully working re-implementation of Fallout, with the same original gameplay, engine bugfixes, and some quality of life improvements, that works (mostly) hassle-free on multiple platforms.
+Fallout MCP lets an AI agent, such as Claude through Claude Code, play Fallout (1997). The agent never touches the mouse. It reads the game through views built for making decisions: in a fight, for example, it sees who's around and its chance to hit each of them. It acts through tools that do what a player means, such as `walk_to`, `attack` and `equip`, rather than through clicks. You can watch the game window while it plays, and take over at any time.
 
-There is also [Fallout 2 Community Edition](https://github.com/alexbatalov/fallout2-ce).
+The engine is [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce), a re-implementation of Fallout's engine that keeps the original gameplay.
 
-## Installation
+## Status
 
-You must own the game to play. Purchase your copy on [GOG](https://www.gog.com/game/fallout) or [Steam](https://store.steampowered.com/app/38400). Download latest [release](https://github.com/alexbatalov/fallout1-ce/releases) or build from source. You can also check latest [debug](https://github.com/alexbatalov/fallout1-ce/actions) build intended for testers.
+An agent can:
+- start a new game with a premade character;
+- equip weapons, reload them and use stimpaks;
+- fight its way through the Vault 13 cave;
+- reach the world map.
 
-### Windows
+It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking, picking things up, the character screen and travel on the world map.
 
-Download and copy `fallout-ce.exe` to your `Fallout` folder. It serves as a drop-in replacement for `falloutw.exe`.
+| Area | Tools |
+| --- | --- |
+| The game | `launch_game`, `quit_game`, `reload_lua`, `ping` |
+| Seeing | `state` (the current screen, its keys, and what's going on), `look` (the same, plus a screenshot), `survey` (looks around without moving) |
+| Input | `key` (keys, as the player presses them), `press` (on-screen buttons that have no key) |
+| Moving | `walk_to` (a tile, a point on the screenshot or a direction) |
+| Combat | `attack`, `end_turn` |
+| Inventory | `inventory`, `equip`, `unequip`, `reload`, `use_item` |
 
-### Linux
+## How it works
 
-- Use Windows installation as a base - it contains data assets needed to play. Copy `Fallout` folder somewhere, for example `/home/john/Desktop/Fallout`.
+- **In the engine** (`src/mcp/`): Lua 5.5 runs inside the game. Each frame it answers requests on a Unix socket, one JSON object per line. Small C++ bindings give it what the game knows and the actions a player can take.
+- **In Lua** (`lua/`): the tools themselves. Lua reloads in the running game, without a rebuild.
+- **The bridge** (`bridge/`): an MCP server on [bun](https://bun.sh). It launches the game, asks it for its tools and passes calls through. This is what you register with Claude Code.
+- **Fair play by default:** the agent learns only what a player could see or know. An omniscient mode, for debugging, reports everything on the map.
 
-- Alternatively you can extract the needed files from the GoG installer:
+The full design, including how every screen is reached without the mouse, is in [docs/mcp-design.md](docs/mcp-design.md).
 
-```console
-$ sudo apt install innoextract
-$ innoextract ~/Downloads/setup_fallout_2.1.0.18.exe -I app
-$ mv app Fallout
+## Getting started
+
+You need your own copy of Fallout, from [Steam](https://store.steampowered.com/app/38400) or [GOG](https://www.gog.com/game/fallout). It has been developed and tested on Linux (NixOS). The flake also covers macOS on Apple Silicon, but that hasn't been tried.
+
+**Build.** The Nix flake's dev shell provides CMake, SDL2 and bun; with direnv, `direnv allow` loads it. Without Nix, install those three yourself.
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFALLOUT_MCP_TESTS=ON
+cmake --build build -j
+cd bridge && bun install
 ```
 
-- Download and copy `fallout-ce` to this folder.
-
-- Install [SDL2](https://libsdl.org/download-2.0.php):
-
-```console
-$ sudo apt install libsdl2-2.0-0
-```
-
-- Run `./fallout-ce`.
-
-### macOS
-
-> **NOTE**: macOS 10.11 (El Capitan) or higher is required. Runs natively on Intel-based Macs and Apple Silicon.
-
-- Use Windows installation as a base - it contains data assets needed to play. Copy `Fallout` folder somewhere, for example `/Applications/Fallout`.
-
-- Alternatively you can use Fallout from MacPlay/The Omni Group as a base - you need to extract game assets from the original bundle. Mount CD/DMG, right click `Fallout` -> `Show Package Contents`, navigate to `Contents/Resources`. Copy `GameData` folder somewhere, for example `/Applications/Fallout`.
-
-- Or if you're a Terminal user and have Homebrew installed you can extract the needed files from the GoG installer:
-
-```console
-$ brew install innoextract
-$ innoextract ~/Downloads/setup_fallout_2.1.0.18.exe -I app
-$ mv app /Applications/Fallout
-```
-
-- Download and copy `fallout-ce.app` to this folder.
-
-- Run `fallout-ce.app`.
-
-### Android
-
-> **NOTE**: Fallout was designed with mouse in mind. There are many controls that require precise cursor positioning, which is not possible with fingers. Current control scheme resembles trackpad usage:
-> - One finger moves mouse cursor around.
-> - Tap one finger for left mouse click.
-> - Tap two fingers for right mouse click (switches mouse cursor mode).
-> - Move two fingers to scroll current view (map view, worldmap view, inventory scrollers).
-
-> **NOTE**: From Android standpoint release and debug builds are different apps. Both apps require their own copy of game assets and have their own savegames. This is intentional. As a gamer just stick with release version and check for updates.
-
-- Use Windows installation as a base - it contains data assets needed to play. Copy `Fallout` folder to your device, for example to `Downloads`. You need `master.dat`, `critter.dat`, and `data` folder. Watch for file names - keep (or make) them lowercased (see [Configuration](#configuration)).
-
-- Download `fallout-ce.apk` and copy it to your device. Open it with file explorer, follow instructions (install from unknown source).
-
-- When you run the game for the first time it will immediately present file picker. Select the folder from the first step. Wait until this data is copied. A loading dialog will appear, just wait for about 30 seconds. The game will start automatically.
-
-### iOS
-
-> **NOTE**: See Android note on controls.
-
-- Download `fallout-ce.ipa`. Use sideloading applications ([AltStore](https://altstore.io/) or [Sideloadly](https://sideloadly.io/)) to install it to your device. Alternatively you can always build from source with your own signing certificate.
-
-- Run the game once. You'll see error message saying "Could not find the master datafile...". This step is needed for iOS to expose the game via File Sharing feature.
-
-- Use Finder (macOS Catalina and later) or iTunes (Windows and macOS Mojave or earlier) to copy `master.dat`, `critter.dat`, and `data` folder to "Fallout" app ([how-to](https://support.apple.com/HT210598)). Watch for file names - keep (or make) them lowercased (see [Configuration](#configuration)).
-
-## Configuration
-
-The main configuration file is `fallout.cfg`. There are several important settings you might need to adjust for your installation. Depending on your Fallout distribution main game assets `master.dat`, `critter.dat`, and `data` folder might be either all lowercased, or all uppercased. You can either update `master_dat`, `critter_dat`, `master_patches` and `critter_patches` settings to match your file names, or rename files to match entries in your `fallout.cfg`.
-
-The `sound` folder (with `music` folder inside) might be located either in `data` folder, or be in the Fallout folder. Update `music_path1` setting to match your hierarchy, usually it's `data/sound/music/` or `sound/music/`. Make sure it match your path exactly (so it might be `SOUND/MUSIC/` if you've installed Fallout from CD). Music files themselves (with `ACM` extension) should be all uppercased, regardless of `sound` and `music` folders.
-
-The second configuration file is `f1_res.ini`. Use it to change game window size and enable/disable fullscreen mode.
+**Game data.** Copy the game's folder to `~/.local/share/fallout1-mcp`, the place the bridge looks by default. A copy keeps saves and settings out of the store's folder. To play in a window at twice the size, set this in its `f1_res.ini`:
 
 ```ini
 [MAIN]
-SCR_WIDTH=1280
-SCR_HEIGHT=720
+SCR_WIDTH=2048
+SCR_HEIGHT=1536
 WINDOWED=1
+SCALE_2X=1
 ```
 
-Recommendations:
-- **Desktops**: Use any size you see fit.
-- **Tablets**: Set these values to logical resolution of your device, for example iPad Pro 11 is 1668x2388 (pixels), but it's logical resolution is 834x1194 (points).
-- **Mobile phones**: Set height to 480, calculate width according to your device screen (aspect) ratio, for example Samsung S21 is 20:9 device, so the width should be 480 * 20 / 9 = 1067.
+**Register the bridge with Claude Code,** from the repository's root:
 
-In time this stuff will receive in-game interface, right now you have to do it manually.
+```bash
+claude mcp add fallout -e FALLOUT_MCP_TURBO=4 -- bun "$PWD/bridge/src/main.ts"
+```
 
-## Contributing
+Then ask Claude to play. It starts the game with `launch_game`.
 
-Here is a couple of current goals. Open up an issue if you have suggestion or feature request.
+## Watching
 
-- **Update to v1.2**. This project is based on Reference Edition which implements v1.1 released in November 1997. There is a newer v1.2 released in March 1998 which at least contains important multilingual support.
+- **The view follows the player,** so you can see what the agent is doing. Set `FALLOUT_MCP_FOLLOW=0` to turn that off.
+- **`FALLOUT_MCP_TURBO`** runs the game faster, from 1 to 16 times normal speed. Movies and sound keep their normal speed.
+- **The mouse works the way it does in a virtual machine's window.** The window leaves your pointer alone until you click in it. Ctrl+Alt gives the pointer back.
 
-- **Backport some Fallout 2 features**. Fallout 2 (with some Sfall additions) added many great improvements and quality of life enhancements to the original Fallout engine. Many deserve to be backported to Fallout 1. Keep in mind this is a different game, with slightly different gameplay balance (which is a fragile thing on its own).
+`bridge/src/config.ts` lists every setting. Several games can run at once, each with its own copy of the data; [CLAUDE.md](CLAUDE.md) says how.
+
+## Development
+
+[CLAUDE.md](CLAUDE.md) is the working guide: the build, the tests, how the game runs from a Claude Code session, and every change made to the engine. In short:
+
+```bash
+ctest --test-dir build --output-on-failure       # C++ and Lua tests
+cd bridge && bun test && bunx tsc --noEmit       # the bridge
+cd bridge && FALLOUT_E2E=1 bun test test/e2e     # the real game, from the cave to the world map
+```
+
+For playing Fallout Community Edition itself on Windows, macOS, Android or iOS, see [upstream's README](https://github.com/alexbatalov/fallout1-ce#readme).
 
 ## License
 
-The source code is this repository is available under the [Sustainable Use License](LICENSE.md).
+The source code in this repository is available under the [Sustainable Use License](LICENSE.md).
