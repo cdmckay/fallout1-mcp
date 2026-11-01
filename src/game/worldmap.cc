@@ -36,6 +36,7 @@
 #include "game/stat.h"
 #include "game/tile.h"
 #include "game/worldmap_walkmask.h"
+#include "mcp/screens.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/db/db.h"
@@ -876,6 +877,21 @@ static unsigned char WorldGrid[31][29];
 // 0x6713C4
 static unsigned char wwin_flag;
 
+// MCP: For worldmap_status: `world_map`'s own `is_moving`, and how its loop
+// was last left.
+static int mcp_moving;
+static int mcp_last_exit = WORLDMAP_EXIT_NONE;
+
+// MCP: The point WORLDMAP_TRAVEL_CODE travels to.
+static int mcp_travel_x;
+static int mcp_travel_y;
+
+// MCP: The town map's place buttons, for worldmap_town_map: the town shown,
+// and each button's name in the order of their codes (514 on).
+static int mcp_places_town = -1;
+static int mcp_places_count = 0;
+static char mcp_places[7][64];
+
 // 0x4AA110
 int init_world_map()
 {
@@ -1056,6 +1072,7 @@ int world_map(WorldMapContext ctx)
                 win_disable_button(TownBttns[index]);
             }
             win_disable_button(WrldToggle);
+            mcp_last_exit = WORLDMAP_EXIT_TOWN; // MCP
             rc = LoadTownMap(TownHotSpots[ctx.town][ctx.section].name, TownHotSpots[ctx.town][ctx.section].map_idx);
             if (rc == -1) {
                 return -1;
@@ -1203,6 +1220,36 @@ int world_map(WorldMapContext ctx)
                 reselect = 0;
                 done = 1;
                 is_entering_townmap = 1;
+            } else if (input == WORLDMAP_TRAVEL_CODE) {
+                // MCP: Travels to a point without the mouse, as clicking the
+                // map there does (below).
+                autofollow = !is_moving;
+                gsound_play_sfx_file("ib1p1xx1");
+                target_xpos = mcp_travel_x;
+                target_ypos = mcp_travel_y;
+                is_moving = 1;
+                world_move_init();
+                dropbtn = 0;
+                is_moving_to_town = InCity(target_xpos, target_ypos) != -1;
+            } else if (input == WORLDMAP_ENTER_CODE) {
+                // MCP: Enters the place the player stands on without the
+                // mouse, as clicking their marker does (below). Like the
+                // marker, it only works once they've stopped.
+                if (dropbtn) {
+                    is_entering_city = 0;
+                    gsound_play_sfx_file("ib2p1xx1");
+                    reselect = 0;
+                    is_entering_random_encounter = 0;
+                    is_entering_random_terrain = 1;
+                    temp_town = InCity(world_xpos, world_ypos);
+                    if (temp_town != -1) {
+                        entering_city = temp_town;
+                        is_entering_city = 1;
+                        is_entering_random_terrain = 0;
+                    }
+
+                    break;
+                }
             } else if ((mouse_get_buttons() & MOUSE_EVENT_LEFT_BUTTON_UP) != 0) {
                 if (mouse_x > 22 && mouse_x < 472 && mouse_y > 21 && mouse_y < 463) {
                     if (dropbtn && hover) {
@@ -1664,6 +1711,8 @@ int world_map(WorldMapContext ctx)
                 }
             }
 
+            mcp_moving = is_moving; // MCP
+
             switch (CheckEvents()) {
             case -1:
                 // FIXME: Typo.
@@ -2096,6 +2145,18 @@ int world_map(WorldMapContext ctx)
         }
 
     out:
+
+        // MCP: How the loop was left, for worldmap_status.
+        if (is_entering_random_encounter) {
+            mcp_last_exit = special_enc_num != 0 ? WORLDMAP_EXIT_SPECIAL_ENCOUNTER : WORLDMAP_EXIT_ENCOUNTER;
+        } else if (is_entering_random_terrain) {
+            mcp_last_exit = WORLDMAP_EXIT_TERRAIN;
+        } else if (is_entering_city || is_entering_townmap) {
+            mcp_last_exit = WORLDMAP_EXIT_TOWN;
+        } else {
+            mcp_last_exit = WORLDMAP_EXIT_NONE;
+        }
+        mcp_moving = 0;
 
         UnInitWorldMapData();
         art_flush();
@@ -3091,6 +3152,8 @@ static void map_num(int value, int digits, int x, int y, int is_town_map)
 // 0x4AD988
 WorldMapContext town_map(WorldMapContext ctx)
 {
+    McpScreen mcpScreen("town_map"); // MCP: for the state view
+
     const char* title;
     const char* text;
     const char* body[1];
@@ -3611,6 +3674,9 @@ static int RegTMAPsels(int win, int city)
 
             debug_printf("button found count=%d, bcount=%d, btnid=%d\n", index, count, TMSelBttns[count]);
 
+            // MCP
+            snprintf(mcp_places[count], sizeof(mcp_places[count]), "%s", name);
+
             win_register_button_sound_func(TMSelBttns[count], gsound_med_butt_press, NULL);
 
             brnpos[count].x = button_x;
@@ -3625,6 +3691,10 @@ static int RegTMAPsels(int win, int city)
 
     debug_printf("button total bcount=%d\n", count);
 
+    // MCP
+    mcp_places_town = v4 == 1 ? TOWN_CATHEDRAL : v4 == 2 ? TOWN_MILITARY_BASE : city;
+    mcp_places_count = count;
+
     return count;
 }
 
@@ -3632,6 +3702,8 @@ static int RegTMAPsels(int win, int city)
 static void UnregTMAPsels(int count)
 {
     int index;
+
+    mcp_places_count = 0; // MCP
 
     for (index = 0; index < count; index++) {
         win_delete_button(TMSelBttns[index]);
@@ -3778,6 +3850,53 @@ static void BlackOut()
 bool world_map_is_open()
 {
     return wwin_flag != 0;
+}
+
+// MCP: What the world map shows: where the player is and what that place is,
+// whether they're travelling and where to, and the towns its list names. Only
+// meaningful while the world map is open.
+void worldmap_status(WorldMapStatus* status)
+{
+    status->x = world_xpos;
+    status->y = world_ypos;
+    status->moving = mcp_moving;
+    status->target_x = target_xpos;
+    status->target_y = target_ypos;
+    status->can_enter = dropbtn;
+    status->town = InCity(world_xpos, world_ypos);
+    status->town_known = status->town != -1
+        && (game_global_vars[cityXgvar[status->town]] == 1 || (first_visit_flag & (1 << status->town)) != 0);
+    status->terrain = WorldTerraTable[world_ypos / 50][world_xpos / 50];
+    status->known_towns = first_visit_flag;
+    status->last_exit = mcp_last_exit;
+}
+
+// MCP: The middle of a town's square on the world map, where its button
+// heads (give or take the few pixels TargetTown scatters it by).
+void worldmap_town_position(int town, int* x, int* y)
+{
+    *x = 50 * city_location[town].column + 50 / 2;
+    *y = 50 * city_location[town].row + 50 / 2;
+}
+
+// MCP: Sets the point WORLDMAP_TRAVEL_CODE travels to, in world-map pixels.
+void worldmap_set_travel_target(int x, int y)
+{
+    mcp_travel_x = x;
+    mcp_travel_y = y;
+}
+
+// MCP: The town map's place buttons: the town shown, and up to `max` place
+// names in the order of their codes, 514 on. Returns how many there are, or
+// 0 when the town map isn't up.
+int worldmap_town_map(int* town, const char** places, int max)
+{
+    int count = mcp_places_count < max ? mcp_places_count : max;
+    for (int index = 0; index < count; index++) {
+        places[index] = mcp_places[index];
+    }
+    *town = mcp_places_town;
+    return mcp_places_count;
 }
 
 } // namespace fallout

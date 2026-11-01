@@ -113,7 +113,7 @@ Every action tool waits until the game is idle (with a timeout) and then returns
 | Interaction | `use`, `pick_up`, `look_at`, `use_skill`, `use_item_on`, `loot` | `action_use_an_object`, `action_get_an_object`, `action_use_skill_on`, `action_use_an_item_on_object`, `action_loot_container` |
 | Dialog | `talk(npc)`, `choose(n)`, `barter(...)` | `action_talk_to`; option keys `'1'`–`'9'` (`gdialog.cc:1374`); `'b'` and `'m'` for barter |
 | Combat | `attack(target, mode)`, `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack_this`, `determine_to_hit`, Space and Return |
-| World map | `travel(location)` | town buttons `500 + town`, map clicks |
+| World map | `travel(place or point)`, `enter(place)` | town buttons `500 + town`, town-map places `514 +`, and command codes for a point and the player's marker |
 | Saves | `save(slot)`, `load(slot)` | `SaveSlot`/`LoadSlot` shims |
 | Lifecycle (bridge) | `launch_game`, `quit_game`, `reload_lua`, `eval_lua` (omniscient only) | — |
 
@@ -180,7 +180,7 @@ This view comes back from every combat action, and from `state` during combat.
 - **Dialog:** the NPC's name, its whole reply (unpaged), the numbered options, and whether barter is available.
 - **Barter and loot:** both sides' items with quantity, weight and value, plus the totals on offer.
 - **Character:** stats, skills with percentages, perks, traits, tagged skills, unspent points and carry weight. Built as the `character` tool; the state view carries the same sheet on the character screen, and elsewhere `player.unspent` says when skill points or a perk are waiting.
-- **World map:** where you are, known locations, and any encounter prompt.
+- **World map:** where you are (the name the player's marker shows, the terrain, the position in map squares), whether you're travelling and where to, and the places the map's list names, with distance and direction. On the town map, the town's places a player can go into. Fallout 1 has no encounter prompt: an encounter drops you on its map, and `travel` says that's what stopped it. Built.
 
 ## Fair play, with an omniscient override
 
@@ -251,6 +251,7 @@ What follows is everything that needs the mouse today, and how each will get a m
 - **Free travel to a point** (`worldmap.cc:1205-1231`) sets `target_xpos`/`target_ypos` and several of `world_map`'s own locals (`is_moving`, `autofollow`, `is_moving_to_town`). That's why the handler has to live inside that loop.
 - **Entering the current location by its marker** (`:1206-1220`) is the only way into empty terrain, or into a town discovered on foot.
 - Known towns already have button codes (`500 + town`).
+- Built: `WORLDMAP_TRAVEL_CODE` travels to a point Lua sets first, and `WORLDMAP_ENTER_CODE` clicks the player's marker (`worldmap.h`). The map's line-stepping stops a pixel short of a point, as it always did, so `travel` allows a pixel's slack.
 
 **Character editor (level-up): command codes, route 3.**
 - Choosing which skill to raise (`InfoButton(531)`, `editor.cc:4701`) sets `skill_cursor`; after that the existing slider keys work. Built: the code `EDITOR_SELECT_SKILL_CODE` plus a skill selects it, and `raise_skill` then presses `+`.

@@ -5,6 +5,7 @@
 
 local character = require("mcp.character")
 local sight = require("mcp.sight")
+local worldmap = require("mcp.worldmap")
 
 local state = {}
 
@@ -26,13 +27,14 @@ local SCREENS = {
 -- What a player sees they can do on each screen, from the screen-by-screen
 -- audit in docs/mcp-design.md. Keys work with `key`, codes with `press`.
 local HINTS = {
-    movie = "A movie is playing. Press escape to skip it. The intro is two movies in a row.",
+    movie = "A movie is playing. Press escape to skip it. When the game starts, the Interplay logo and then the intro play, so that takes two escapes; the Overseer's briefing after choosing a character takes one.",
     main_menu = "Main menu. Keys: n new game, l load game, i intro, c credits, e exit. (Escape here would quit the game, so key skips it.)",
     character_select = "Choosing a character; `premade` shows the one on screen. Keys: left and right browse the premade characters, t takes this one, m modifies it, c creates a new one, b goes back.",
     character_editor = "Character editor. Keys: return when done, escape to cancel.",
     character = "Character screen; `character` below is the sheet. raise_skill spends skill points here. Keys: return closes it keeping changes, escape closes it undoing them.",
     perk_choice = "Choosing a perk; `character.choice` lists the options. choose_perk takes one by name. Escape puts the perk off until the character screen next opens (in a follow-up question, escape gives the perk up).",
-    world_map = "World map.",
+    world_map = "World map; `world_map` below says where you are and lists the places you know, nearest first, in map squares. travel goes to one of them by name, or to a point (x, y in squares); enter goes into the place you're standing on. Random encounters can stop a trip. Keys: arrows scroll the view, c centres it on you, a toggles following you; press 512 opens the town map.",
+    town_map = "Town map; `town_map.places` lists where you can go in. enter takes one by name. press 512 goes to the world map (travel does too).",
     dialog = "In conversation. Keys 1 to 9 choose a reply.",
     combat = "In combat. attack a critter by id, or end_turn to pass. Keys: n cycles the attack mode, b swaps hands.",
     map = "Exploring the map.",
@@ -261,8 +263,13 @@ function state.view()
     local mode = state.mode(fo.flags())
     local player = fo.player()
 
+    local on_world_map = mode == "world_map" or mode == "town_map"
+
     -- Where the player is on the screenshot, to aim screen-point moves from.
-    if player ~= nil and mode ~= "world_map" then
+    -- On the world map they aren't on any map: `world_map` says where they are.
+    if player ~= nil and on_world_map then
+        player.map, player.tile, player.elevation = nil, nil, nil
+    elseif player ~= nil then
         player.screen = screen_point(player.tile)
     end
 
@@ -280,6 +287,11 @@ function state.view()
         view.character = character.sheet()
     elseif player ~= nil then
         player.unspent = character.unspent()
+    end
+
+    if on_world_map then
+        view.world_map = worldmap.view()
+        view.town_map = worldmap.town_map()
     end
 
     if mode == "combat" then
