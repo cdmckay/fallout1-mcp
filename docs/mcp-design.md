@@ -213,7 +213,7 @@ The rule:
 
 - **Layout.** Each line is a row of hexes as they sit on screen, offset half a hex from the next, so odd columns sit half a row down. `walk_to`'s directions stay straight: e and w are two characters along a line; ne, se, sw and nw are a line up or down and a character across; n and s are straight up and down.
 - **Floor.** Floor is drawn only where the player can walk. That's what the game's move cursor tells a player who points at a hex: it shows an X where `make_path` finds no way. A breadth-first walk from the player answers it for the whole screen at once. In a cave this leaves the rock blank (it's floor art the player can't reach), so the corridors stand out between their walls.
-- **Walls.** Walls are drawn where they border that floor.
+- **Walls.** Walls and doors are drawn where they border that floor.
 - **Critters** get letters keyed to their ids, nearest first, in fair play only those `critters` lists.
 - **Why on `look`.** `look` is the call for getting one's bearings, so one call gives the picture and the map. A separate `map` tool would mean two calls at every new scene.
 

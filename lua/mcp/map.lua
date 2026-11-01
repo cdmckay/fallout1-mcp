@@ -10,8 +10,8 @@
 -- and down, a line per hex.
 --
 -- Floor is drawn only where the player can walk to, as the game's move
--- cursor tells a player who points at a hex, and walls only where they
--- border it. In a cave that leaves the rock blank, since the rock is floor
+-- cursor tells a player who points at a hex, and walls and doors only where
+-- they border it. In a cave that leaves the rock blank, since the rock is floor
 -- art the player can't get onto, and the corridors stand out between their
 -- walls.
 
@@ -45,7 +45,7 @@ local function ground(hex, omniscient, borders)
         return borders and "#" or " "
     end
     if hex.terrain == "door" then
-        return "+"
+        return borders and "+" or " "
     end
     if hex.item_visible or (omniscient and hex.item) then
         return "*"
