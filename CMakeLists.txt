@@ -282,6 +282,8 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/lua_host.h"
     "src/mcp/mcp.cc"
     "src/mcp/mcp.h"
+    "src/mcp/png.cc"
+    "src/mcp/png.h"
     "src/mcp/socket_server.cc"
     "src/mcp/socket_server.h"
 )
@@ -373,6 +375,9 @@ target_link_libraries(${EXECUTABLE_NAME} fpattern::fpattern)
 
 add_subdirectory("third_party/lua")
 target_link_libraries(${EXECUTABLE_NAME} lua::lua)
+
+add_subdirectory("third_party/stb")
+target_link_libraries(${EXECUTABLE_NAME} stb::stb)
 
 if(FALLOUT_MCP_TESTS)
     enable_testing()

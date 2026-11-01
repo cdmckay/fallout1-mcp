@@ -502,7 +502,9 @@ static int SliderNegID;
 static MessageListItem mesg;
 
 // 0x56EC74
-static int edit_win;
+//
+// MCP: -1 while the editor is closed, so `editor_is_open` can tell.
+static int edit_win = -1;
 
 // 0x56EC78
 static unsigned char* pwin_buf;
@@ -1385,6 +1387,7 @@ static int CharEditStart()
 static void CharEditEnd()
 {
     win_delete(edit_win);
+    edit_win = -1;
 
     for (int index = 0; index < EDITOR_GRAPHIC_COUNT; index++) {
         art_ptr_unlock(grph_key[index]);
@@ -6207,6 +6210,12 @@ static int is_supper_bonus()
     }
 
     return 0;
+}
+
+// MCP: Whether the character editor is on screen.
+bool editor_is_open()
+{
+    return edit_win != -1;
 }
 
 } // namespace fallout

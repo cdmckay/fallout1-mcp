@@ -158,6 +158,9 @@ WorldMapContext town_map(WorldMapContext ctx);
 void KillWorldWin();
 int worldmap_script_jump(int city, int a2);
 int xlate_mapidx_to_town(int map_idx);
+
+// MCP
+bool world_map_is_open();
 int PlayCityMapMusic();
 
 } // namespace fallout

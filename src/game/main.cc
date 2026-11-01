@@ -86,6 +86,10 @@ static bool main_show_death_scene = false;
 // 0x614838
 static bool main_death_voiceover_done;
 
+// MCP: Whether a game is in progress, from new or loaded game to quitting
+// back to the menu.
+static bool main_game_running = false;
+
 // 0x4725E8
 int gnw_main(int argc, char** argv)
 {
@@ -327,6 +331,9 @@ static void main_game_loop()
 
     scr_enable();
 
+    // MCP
+    main_game_running = true;
+
     while (game_user_wants_to_quit == 0) {
         sharedFpsLimiter.mark();
 
@@ -350,11 +357,20 @@ static void main_game_loop()
         sharedFpsLimiter.throttle();
     }
 
+    // MCP
+    main_game_running = false;
+
     scr_disable();
 
     if (cursorWasHidden) {
         mouse_hide();
     }
+}
+
+// MCP
+bool main_game_is_running()
+{
+    return main_game_running;
 }
 
 // 0x472AE8

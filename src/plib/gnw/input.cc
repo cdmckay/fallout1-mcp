@@ -310,6 +310,19 @@ void flush_input_buffer()
     input_put = 0;
 }
 
+// MCP: Whether input is waiting to be read by `get_input`, so an injected key
+// can be followed until the game has taken it.
+bool input_buffer_is_empty()
+{
+    return input_get == -1;
+}
+
+// MCP: Whether `GNW_add_input_buffer` would drop the next code.
+bool input_buffer_is_full()
+{
+    return input_get != -1 && input_put == input_get;
+}
+
 // 0x4B3564
 void GNW_do_bk_process()
 {

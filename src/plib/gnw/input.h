@@ -21,6 +21,8 @@ void get_input_position(int* x, int* y);
 void process_bk();
 void GNW_add_input_buffer(int a1);
 void flush_input_buffer();
+bool input_buffer_is_empty(); // MCP
+bool input_buffer_is_full(); // MCP
 void GNW_do_bk_process();
 void add_bk_process(BackgroundProcess* f);
 void remove_bk_process(BackgroundProcess* f);

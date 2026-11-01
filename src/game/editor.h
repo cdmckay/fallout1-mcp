@@ -20,6 +20,9 @@ int editor_load(DB_FILE* stream);
 void editor_reset();
 void RedrwDMPrk();
 
+// MCP
+bool editor_is_open();
+
 } // namespace fallout
 
 #endif /* FALLOUT_GAME_EDITOR_H_ */

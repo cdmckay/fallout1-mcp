@@ -7,6 +7,9 @@ extern int main_game_paused;
 
 int gnw_main(int argc, char** argv);
 
+// MCP
+bool main_game_is_running();
+
 } // namespace fallout
 
 #endif /* FALLOUT_GAME_MAIN_H_ */

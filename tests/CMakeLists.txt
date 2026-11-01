@@ -12,14 +12,16 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(mcp_tests
     "mcp/line_buffer_test.cc"
     "mcp/lua_host_test.cc"
+    "mcp/png_test.cc"
     "mcp/socket_server_test.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/line_buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/lua_host.cc"
+    "${CMAKE_SOURCE_DIR}/src/mcp/png.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/socket_server.cc"
 )
 
-target_include_directories(mcp_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(mcp_tests PRIVATE Catch2::Catch2WithMain lua::lua)
+target_include_directories(mcp_tests PRIVATE "${CMAKE_SOURCE_DIR}/src" ${SDL2_INCLUDE_DIRS})
+target_link_libraries(mcp_tests PRIVATE Catch2::Catch2WithMain lua::lua stb::stb ${SDL2_LIBRARIES})
 target_compile_definitions(mcp_tests PRIVATE MCP_LUA_DIR="${CMAKE_SOURCE_DIR}/lua")
 
 list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
