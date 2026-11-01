@@ -29,6 +29,9 @@ void mcp_register_map_bindings(lua_State* L);
 // The walking bindings (bindings_walk.cc), added to the same table.
 void mcp_register_walk_bindings(lua_State* L);
 
+// The world map bindings (bindings_worldmap.cc), added to the same table.
+void mcp_register_worldmap_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

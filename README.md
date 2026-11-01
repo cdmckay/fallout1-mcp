@@ -13,9 +13,9 @@ An agent can:
 - equip weapons, reload them and use stimpaks;
 - read its character sheet, and spend a level-up's skill points and perk;
 - fight its way through the Vault 13 cave;
-- reach the world map.
+- travel the world map, and go into the places it knows.
 
-It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking, picking things up and travel on the world map.
+It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking and picking things up.
 
 | Area | Tools |
 | --- | --- |
@@ -26,6 +26,7 @@ It does all of this without the mouse. Each play test turns what tripped the age
 | Combat | `attack`, `end_turn` |
 | Inventory | `inventory`, `equip`, `unequip`, `reload`, `use_item` |
 | Character | `character` (the character sheet), `raise_skill`, `choose_perk` |
+| World map | `travel` (to a place the map knows, or a point), `enter` (the place you're at) |
 
 ## How it works
 

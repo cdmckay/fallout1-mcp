@@ -111,6 +111,7 @@ function tests.every_screen_the_engine_names_has_a_hint()
     local names = {
         "inventory", "use_item_on", "loot", "barter", "pipboy", "options", "preferences",
         "skilldex", "automap", "save", "load", "elevator", "help", "character", "character_editor",
+        "town_map",
     }
 
     for _, name in ipairs(names) do
@@ -119,6 +120,16 @@ function tests.every_screen_the_engine_names_has_a_hint()
         equal(view.mode, name, "mode")
         assert(not view.hint:find("doesn't know", 1, true), "no specific hint for " .. name)
     end
+end
+
+function tests.the_movie_hint_says_how_many_escapes_skip_it()
+    local state = fresh_state()
+    fake_game({ flags = { movie = true }, no_player = true })
+
+    local view = state.view()
+
+    support.contains(view.hint, "two escapes", "the logo and the intro")
+    support.contains(view.hint, "briefing after choosing a character takes one", "the briefing")
 end
 
 function tests.character_select_shows_the_premade_on_screen()

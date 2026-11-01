@@ -7,4 +7,5 @@ return function(core)
     require("tools.combat")(core)
     require("tools.inventory")(core)
     require("tools.character")(core)
+    require("tools.worldmap")(core)
 end

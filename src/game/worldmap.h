@@ -163,6 +163,43 @@ int xlate_mapidx_to_town(int map_idx);
 bool world_map_is_open();
 int PlayCityMapMusic();
 
+// MCP: Event codes the agent injects into the world map's loop, for what
+// otherwise needs the mouse: travel to the point worldmap_set_travel_target
+// set, as clicking the map there does, and enter the place the player stands
+// on, as clicking their marker does.
+#define WORLDMAP_TRAVEL_CODE 0x7100
+#define WORLDMAP_ENTER_CODE 0x7101
+
+// MCP: How the world map's loop was last left.
+typedef enum WorldMapExit {
+    WORLDMAP_EXIT_NONE, // not left, or left for the main menu
+    WORLDMAP_EXIT_TERRAIN, // into the open ground the player stood on
+    WORLDMAP_EXIT_TOWN, // into a town
+    WORLDMAP_EXIT_ENCOUNTER, // a random encounter
+    WORLDMAP_EXIT_SPECIAL_ENCOUNTER, // one of the special encounters
+} WorldMapExit;
+
+// MCP: What the world map shows, in world-map pixels (50 to a square).
+typedef struct WorldMapStatus {
+    int x; // the player
+    int y;
+    int moving;
+    int target_x; // where they're headed, while moving
+    int target_y;
+    int can_enter; // standing still with their marker up
+    int town; // the town they're in, or -1
+    int town_known; // whether the map names it
+    int terrain; // a TerrainType
+    int known_towns; // a bit per town the map lists
+    int last_exit; // a WorldMapExit
+} WorldMapStatus;
+
+// MCP
+void worldmap_status(WorldMapStatus* status);
+void worldmap_town_position(int town, int* x, int* y);
+void worldmap_set_travel_target(int x, int y);
+int worldmap_town_map(int* town, const char** places, int max);
+
 } // namespace fallout
 
 #endif /* FALLOUT_GAME_WORLDMAP_H_ */
