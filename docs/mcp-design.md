@@ -1,6 +1,6 @@
 # fallout1-mcp design
 
-Status: draft for discussion, 2026-11-01. Nothing here is built yet.
+Status: the first slice is built (issues #1–#9). The state view, `look`, `key`, `press`, `walk_to`, `attack` and `end_turn` work against the real game, and an end-to-end test leaves the Vault 13 cave without the mouse. The rest of this document is the plan.
 
 ## Goal
 
@@ -55,7 +55,7 @@ Every player action has a path that doesn't read the mouse. If the agent has to 
 2. **Call the engine directly for actions on the map.** Walking, using, picking up, talking, looting, skills, items on targets and attacks all have engine functions (`register_object_move_to_tile`, `action_*`, `combat_attack`). An aimed shot passes the hit location straight to `combat_attack`, so the called-shot picker never opens.
 3. **Add a command code for mouse-only operations inside a screen.** Examples are dragging an item to a hand slot, moving items onto the barter table, and choosing a free-travel point on the world map. Each gets a new event code (in a range of its own) that the screen's own loop handles, calling the internal function the drag would have called. Arguments travel in a small pending-command struct that Lua fills before injecting the code. Handling the command inside the loop keeps that screen's local state (list offsets, displayed stacks, redraws) consistent. A call from outside the loop would bypass it.
 
-The punch list of route-3 actions comes from a screen-by-screen audit, below.
+The punch list of route-3 actions comes from a screen-by-screen audit, under "No-mouse punch list" below.
 
 **Deferred calls.** Some engine calls open a screen synchronously, for example a loot animation's callback or a script's dialog request. A coroutine that made such a call would be stuck inside that screen's loop with nobody resuming it. So coroutines never make those calls directly. They `defer(fn)` and yield, and the hook runs deferred functions outside any coroutine. The screen's own loop then calls `process_bk` → the hook again, one level deeper, and that nested hook can resume the waiting coroutine. The re-entrancy guard only stops a coroutine being resumed while one is already running.
 
@@ -191,6 +191,55 @@ Decided: fair play is the default.
 
 Each state field is tagged fair or omniscient where it is defined in Lua, so the filter is one place, not a check scattered through every tool. Some fields still need a judgement as they are added, for example whether an NPC's hostility shows before combat starts.
 
+## No-mouse punch list
+
+A screen-by-screen audit (2026-11-01) sorted every player action into three kinds: a key the screen handles, a button event code that can be injected, or something that only works with the mouse. These screens need nothing new, because keys and button codes already reach everything on them:
+- the main menu and character select;
+- dialog, except replies past the ninth and Review;
+- skilldex, options and save/load;
+- the elevator, called shot and automap;
+- death, endgame, credits and movies;
+- popups.
+
+What follows is everything that needs the mouse today, and how each will get a mouse-free path. Engine locations are file:line.
+
+**Map view: semantic tools, route 2.** These are the core of play:
+- walking: `walk_to`, built;
+- the primary action on an object: `use`, `pick_up` or `talk`, as `gmouse.cc:904-950` dispatches it;
+- the hold-click action menu: each outcome as its own tool;
+- attacking: `attack`, built;
+- using an item on an object: `action_use_an_item_on_object`;
+- a skill on a target: `action_use_skill_on`. This is also how First Aid and Doctor are used on yourself.
+
+**Inventory: command codes inside `handle_inventory`, route 3.**
+- **Equip and drop.** Equipping a hand or armor, unequipping, dropping into a bag and reloading by drag all go through `inven_pickup` (`inventry.cc:1946`), using `switch_hand`, `drop_into_container` and `drop_ammo_into_weapon`.
+- **The item menu.** Look, use, drop and unload are in `inven_action_cursor` (`:3222`).
+- **State to keep consistent:** the statics `i_lhand`, `i_rhand` and `i_worn`, which `setup_inventory` and `exit_inventory` move in and out of the inventory, and `stack_offset[curr_stack]`. Each code has to end with the same redraws the drag does (`:2132-2135`).
+
+**Use-item-on, loot and barter: command codes, route 3.**
+- **Picking the item for use-on:** `inventry.cc:2357-2361`.
+- **Loot and steal.** Moving one item either way goes through `move_inventory` → `item_move` (`:3910`, `:3934`), quantity included. When stealing, `gStealCount`, `gStealSize` and the stealing XP locals must stay in step.
+- **Barter.** Each of the four table moves is `item_move_force` between the inventories and `ptable`/`btable` (`:4738-4786`), followed by redrawing both tables.
+
+**World map: command codes inside `world_map`, route 3.**
+- **Free travel to a point** (`worldmap.cc:1205-1231`) sets `target_xpos`/`target_ypos` and several of `world_map`'s own locals (`is_moving`, `autofollow`, `is_moving_to_town`). That's why the handler has to live inside that loop.
+- **Entering the current location by its marker** (`:1206-1220`) is the only way into empty terrain, or into a town discovered on foot.
+- Known towns already have button codes (`500 + town`).
+
+**Character editor (level-up): command codes, route 3.**
+- Choosing which skill to raise (`InfoButton(531)`, `editor.cc:4701`) sets `skill_cursor`; after that the existing slider keys work.
+- The Perks/Karma/Kills folder tab (`FldrButton`, `:4612`) sets `folder`.
+
+**Pip-Boy: command code, route 3.** On the status tab, choosing a quest location or a holodisk depends on the mouse's x position (`PipStatus`, `pipboy.cc:1002`). The new code sets that choice directly.
+
+**Preferences: command codes or engine calls.** Every setting is changed in `DoThing` (`options.cc:1122`), which reads the mouse, and the sliders are drag loops. This is low priority: the agent rarely needs preferences.
+
+**Gaps that aren't the mouse:**
+- **Dialog replies past the ninth** can't be chosen at all. Their button codes fail the `'0'..'9'` check (`gdialog.cc:1374`), so they need a code of their own.
+- **Dialog Review** and **message-log scrolling** are button callbacks with no code. The views already give the agent the reply history and the message log, so neither is needed.
+- **Running instead of walking**, **Ctrl-reserving AP in combat** and **the main menu's quotes** read raw key state (`keys[]`), not input codes. `walk_to` and `attack` already pass run and reserved AP directly.
+- **F12** never reaches a screen: the engine turns it into a screenshot on disk. `key` refuses it.
+
 ## Decisions to make
 
 1. **Should the game pause between commands?** Outside combat, the world keeps running in real time while the agent thinks. *Recommendation: not in the first slice.* Fallout's combat is already turn-based, and exploration rarely punishes a slow reader. Freezing the clock means skipping `GNW_do_bk_process` between commands, which risks leaving animations or scripts half-done. Revisit if wandering NPCs turn out to be a problem.
@@ -206,7 +255,14 @@ The first slice is thin but runs end to end, so every seam is exercised before t
 4. A bridge with dynamic tool discovery, `launch_game` and `reload_lua`.
 5. **Proof:** from Claude Code, launch the game, start a new game with a premade character, and walk out of the Vault 13 cave, all without touching the mouse.
 
-Semantic tools follow, roughly in the order a game needs them: movement and objects, dialog, combat, inventory, world map, saves.
+Built, with three additions the cave turned out to need:
+- **Combat basics (#8).** The cave has rats.
+- **The exits a player can see**, in the state view.
+- **Turbo mode (#9).** The end-to-end test takes about 10 seconds instead of minutes.
+
+The view also follows the player, so the game is easy to watch.
+
+Semantic tools follow, roughly in the order a game needs them: objects (`use`, `pick_up`, `talk`, `look_at`), dialog, inventory, world map, saves. Then the remaining punch-list command codes.
 
 ## Running on mango
 
