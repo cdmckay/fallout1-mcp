@@ -19,6 +19,10 @@ bool mcp_in_game();
 // The inventory bindings (bindings_inventory.cc), added to the same table.
 void mcp_register_inventory_bindings(lua_State* L);
 
+// The character sheet bindings (bindings_character.cc), added to the same
+// table.
+void mcp_register_character_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

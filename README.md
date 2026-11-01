@@ -11,10 +11,11 @@ The engine is [Fallout Community Edition](https://github.com/alexbatalov/fallout
 An agent can:
 - start a new game with a premade character;
 - equip weapons, reload them and use stimpaks;
+- read its character sheet, and spend a level-up's skill points and perk;
 - fight its way through the Vault 13 cave;
 - reach the world map.
 
-It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking, picking things up, the character screen and travel on the world map.
+It does all of this without the mouse. Each play test turns what tripped the agent up into [issues](https://github.com/cdmckay/fallout1-mcp/issues), and they set what comes next: a text map of what's on screen, talking, picking things up and travel on the world map.
 
 | Area | Tools |
 | --- | --- |
@@ -24,6 +25,7 @@ It does all of this without the mouse. Each play test turns what tripped the age
 | Moving | `walk_to` (a tile, a point on the screenshot or a direction) |
 | Combat | `attack`, `end_turn` |
 | Inventory | `inventory`, `equip`, `unequip`, `reload`, `use_item` |
+| Character | `character` (the character sheet), `raise_skill`, `choose_perk` |
 
 ## How it works
 

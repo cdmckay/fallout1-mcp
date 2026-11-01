@@ -179,7 +179,7 @@ This view comes back from every combat action, and from `state` during combat.
 
 - **Dialog:** the NPC's name, its whole reply (unpaged), the numbered options, and whether barter is available.
 - **Barter and loot:** both sides' items with quantity, weight and value, plus the totals on offer.
-- **Character:** stats, skills with percentages, perks, traits, tagged skills, unspent points and carry weight.
+- **Character:** stats, skills with percentages, perks, traits, tagged skills, unspent points and carry weight. Built as the `character` tool; the state view carries the same sheet on the character screen, and elsewhere `player.unspent` says when skill points or a perk are waiting.
 - **World map:** where you are, known locations, and any encounter prompt.
 
 ## Fair play, with an omniscient override
@@ -227,8 +227,9 @@ What follows is everything that needs the mouse today, and how each will get a m
 - Known towns already have button codes (`500 + town`).
 
 **Character editor (level-up): command codes, route 3.**
-- Choosing which skill to raise (`InfoButton(531)`, `editor.cc:4701`) sets `skill_cursor`; after that the existing slider keys work.
-- The Perks/Karma/Kills folder tab (`FldrButton`, `:4612`) sets `folder`.
+- Choosing which skill to raise (`InfoButton(531)`, `editor.cc:4701`) sets `skill_cursor`; after that the existing slider keys work. Built: the code `EDITOR_SELECT_SKILL_CODE` plus a skill selects it, and `raise_skill` then presses `+`.
+- The perk list needs no code: Home, Down and Return reach every perk, and Tag!'s and Mutate!'s follow-up lists work the same way. `choose_perk` uses them.
+- The Perks/Karma/Kills folder tab (`FldrButton`, `:4612`) sets `folder`. The character view lists perks whichever tab is open, so this one waits until karma or kills are needed.
 
 **Pip-Boy: command code, route 3.** On the status tab, choosing a quest location or a holodisk depends on the mouse's x position (`PipStatus`, `pipboy.cc:1002`). The new code sets that choice directly.
 

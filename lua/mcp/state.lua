@@ -3,6 +3,8 @@
 -- around them, a fight's turn and odds, and the message window's new lines.
 -- See "Decision views" in docs/mcp-design.md.
 
+local character = require("mcp.character")
+
 local state = {}
 
 -- Several of the engine's flags can be set at once: the editor opens over
@@ -27,7 +29,8 @@ local HINTS = {
     main_menu = "Main menu. Keys: n new game, l load game, i intro, c credits, e exit. (Escape here would quit the game, so key skips it.)",
     character_select = "Choosing a character; `premade` shows the one on screen. Keys: left and right browse the premade characters, t takes this one, m modifies it, c creates a new one, b goes back.",
     character_editor = "Character editor. Keys: return when done, escape to cancel.",
-    character = "Character screen. Escape closes it.",
+    character = "Character screen; `character` below is the sheet. raise_skill spends skill points here. Keys: return closes it keeping changes, escape closes it undoing them.",
+    perk_choice = "Choosing a perk; `character.choice` lists the options. choose_perk takes one by name. Escape puts the perk off until the character screen next opens (in a follow-up question, escape gives the perk up).",
     world_map = "World map.",
     dialog = "In conversation. Keys 1 to 9 choose a reply.",
     combat = "In combat. attack a critter by id, or end_turn to pass. Keys: n cycles the attack mode, b swaps hands.",
@@ -265,6 +268,12 @@ function state.view()
 
     if mode == "character_select" then
         view.premade = fo.premade()
+    end
+
+    if mode == "character" or mode == "perk_choice" then
+        view.character = character.sheet()
+    elseif player ~= nil then
+        player.unspent = character.unspent()
     end
 
     if mode == "combat" then

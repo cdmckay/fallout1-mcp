@@ -277,6 +277,7 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
 target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/bindings.cc"
     "src/mcp/bindings.h"
+    "src/mcp/bindings_character.cc"
     "src/mcp/bindings_inventory.cc"
     "src/mcp/line_buffer.cc"
     "src/mcp/line_buffer.h"
