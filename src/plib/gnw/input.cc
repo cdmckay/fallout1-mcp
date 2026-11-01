@@ -1148,6 +1148,16 @@ void GNW95_process_message()
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+            // CE: Ctrl+Alt gives the pointer back to the desktop, as in a
+            // virtual machine's window; see `dxinput_capture_mouse`.
+            if (e.type == SDL_KEYDOWN
+                && (e.key.keysym.scancode == SDL_SCANCODE_LCTRL || e.key.keysym.scancode == SDL_SCANCODE_RCTRL
+                    || e.key.keysym.scancode == SDL_SCANCODE_LALT || e.key.keysym.scancode == SDL_SCANCODE_RALT)
+                && (e.key.keysym.mod & KMOD_CTRL) != 0
+                && (e.key.keysym.mod & KMOD_ALT) != 0) {
+                dxinput_release_mouse(true);
+            }
+
             if (!kb_is_disabled()) {
                 keyboardData.key = e.key.keysym.scancode;
                 keyboardData.down = (e.key.state & SDL_PRESSED) != 0;
@@ -1169,6 +1179,10 @@ void GNW95_process_message()
                 audioEngineResume();
                 break;
             case SDL_WINDOWEVENT_FOCUS_LOST:
+                // CE: Switching away lets go of the pointer, so coming back
+                // takes a click rather than grabbing it on sight.
+                dxinput_release_mouse(false);
+
                 // MCP: An agent plays while its window is in the background,
                 // so the game must not freeze in `GNW95_lost_focus`.
                 if (!mcp_is_enabled()) {

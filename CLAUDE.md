@@ -112,7 +112,7 @@ Its output is in `journalctl --user -u fallout1-mcp`, and `systemctl --user stop
 
 Comments starting `// CE:` mark where upstream departs from the original game. This fork uses the same marker for its own changes:
 
-- **Windowed mouse** (`src/plib/gnw/dxinput.cc`, `src/plib/gnw/mouse.cc`): in a window, the cursor follows the system pointer instead of using SDL's relative mode, which locks the pointer to the window. Fullscreen keeps relative mode.
+- **Mouse capture** (`src/plib/gnw/dxinput.cc`, `src/plib/gnw/input.cc`): the pointer works the way it does in a virtual machine's window. The window starts with the pointer free. A click in the window captures it, and that click doesn't reach the game. Ctrl+Alt releases it, and so does switching to another window. While captured, SDL's relative mode locks the pointer to the window, as upstream does, so pushing against an edge scrolls the map, and the window title says how to get out. While released, the game ignores the mouse and doesn't edge-scroll (`gmouse.cc`, `worldmap.cc`). Fullscreen captures from the start.
 
 ## License
 

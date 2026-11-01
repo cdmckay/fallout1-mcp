@@ -498,13 +498,8 @@ void mouse_info()
     }
 
     // Adjust for mouse senstivity.
-    //
-    // CE: Not when following the system pointer, where scaling the delta would
-    // pull the cursor off it.
-    if (!dxinput_mouse_is_absolute()) {
-        x = (int)(x * mouse_sensitivity);
-        y = (int)(y * mouse_sensitivity);
-    }
+    x = (int)(x * mouse_sensitivity);
+    y = (int)(y * mouse_sensitivity);
 
     if (vcr_state == VCR_STATE_PLAYING) {
         if (((vcr_terminate_flags & VCR_TERMINATE_ON_MOUSE_PRESS) != 0 && buttons != 0)

@@ -21,6 +21,7 @@
 #include "game/tile.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
+#include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/input.h"
@@ -2299,6 +2300,12 @@ static int gmouse_3d_move_to(int x, int y, int elevation, Rect* a4)
 static int gmouse_check_scrolling(int x, int y, int cursor)
 {
     if (!gmouse_scrolling_enabled) {
+        return -1;
+    }
+
+    // CE: Not while the pointer is the desktop's, when the cursor stays where
+    // it was left, possibly against an edge; see `dxinput_capture_mouse`.
+    if (!dxinput_mouse_is_captured()) {
         return -1;
     }
 

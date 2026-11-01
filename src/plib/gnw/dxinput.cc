@@ -1,7 +1,10 @@
 #include "plib/gnw/dxinput.h"
 
+#include <stdio.h>
+
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
+#include "plib/gnw/winmain.h"
 
 namespace fallout {
 
@@ -13,9 +16,15 @@ static void dxinput_keyboard_exit();
 static int gMouseWheelDeltaX = 0;
 static int gMouseWheelDeltaY = 0;
 
-// CE: Whether the mouse follows the system pointer instead of reading relative
-// motion. See `dxinput_mouse_init`.
-static bool gMouseAbsolute = false;
+// CE: Whether the game has the pointer, the way a virtual machine's window has
+// it. Captured, SDL's relative mode locks the pointer to the window and reports
+// DirectInput-style deltas. Released, the pointer belongs to the desktop and the
+// game ignores it. A click in the window captures it, and Ctrl+Alt releases it.
+static bool gMouseCaptured = false;
+
+// CE: The click that captures the pointer is for the window, not the game, so
+// the buttons read as up until it's let go.
+static bool gMouseSwallowClick = false;
 
 // 0x4E0400
 bool dxinput_init()
@@ -70,26 +79,26 @@ bool dxinput_get_mouse_state(MouseData* mouseState)
     // update mouse position manually.
     SDL_PumpEvents();
 
-    Uint32 buttons;
-    if (gMouseAbsolute) {
-        int windowX;
-        int windowY;
-        buttons = SDL_GetMouseState(&windowX, &windowY);
+    Uint32 buttons = SDL_GetRelativeMouseState(&(mouseState->x), &(mouseState->y));
 
-        float logicalX;
-        float logicalY;
-        SDL_RenderWindowToLogical(gSdlRenderer, windowX, windowY, &logicalX, &logicalY);
-
-        // Callers move the cursor by a delta, so report the distance from the
-        // cursor to the pointer.
-        int cursorX;
-        int cursorY;
-        mouse_get_position(&cursorX, &cursorY);
-        mouseState->x = static_cast<int>(logicalX) - cursorX;
-        mouseState->y = static_cast<int>(logicalY) - cursorY;
-    } else {
-        buttons = SDL_GetRelativeMouseState(&(mouseState->x), &(mouseState->y));
+    // CE: Released, the pointer is the desktop's: no motion, buttons or wheel.
+    // The deltas are still read above, so they don't pile up for the next
+    // capture.
+    if (!gMouseCaptured) {
+        mouseState->x = 0;
+        mouseState->y = 0;
+        buttons = 0;
+        gMouseWheelDeltaX = 0;
+        gMouseWheelDeltaY = 0;
     }
+
+    if (gMouseSwallowClick) {
+        if ((buttons & (SDL_BUTTON(SDL_BUTTON_LEFT) | SDL_BUTTON(SDL_BUTTON_RIGHT))) == 0) {
+            gMouseSwallowClick = false;
+        }
+        buttons = 0;
+    }
+
     mouseState->buttons[0] = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
     mouseState->buttons[1] = (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
     mouseState->wheelX = gMouseWheelDeltaX;
@@ -129,20 +138,68 @@ bool dxinput_read_keyboard_buffer(KeyboardData* keyboardData)
 // 0x4E070C
 bool dxinput_mouse_init()
 {
-    // CE: Relative mode reproduces DirectInput's mouse deltas, but it also
-    // locks the pointer to the window. In a window, follow the system pointer
-    // instead, so it can leave.
+    // CE: A window leaves the pointer alone until it's clicked. Fullscreen takes
+    // it straight away, since there's nothing else on screen to point at.
     if ((SDL_GetWindowFlags(gSdlWindow) & SDL_WINDOW_FULLSCREEN) == 0) {
-        gMouseAbsolute = true;
+        SDL_ShowCursor(SDL_ENABLE);
         return true;
     }
 
-    return SDL_SetRelativeMouseMode(SDL_TRUE) == 0;
+    return dxinput_capture_mouse();
 }
 
-bool dxinput_mouse_is_absolute()
+// CE: Takes the pointer; see `gMouseCaptured`. The window title says how to let
+// it go.
+bool dxinput_capture_mouse()
 {
-    return gMouseAbsolute;
+    if (SDL_SetRelativeMouseMode(SDL_TRUE) != 0) {
+        return false;
+    }
+
+    // Drop the motion from while the pointer was the desktop's.
+    SDL_GetRelativeMouseState(NULL, NULL);
+    SDL_ShowCursor(SDL_DISABLE);
+    gMouseCaptured = true;
+
+    char title[sizeof(GNW95_title) + 64];
+    snprintf(title, sizeof(title), "%s (press Ctrl+Alt to release the mouse)", GNW95_title);
+    SDL_SetWindowTitle(gSdlWindow, title);
+
+    return true;
+}
+
+// CE: Gives the pointer back to the desktop; see `gMouseCaptured`. With
+// `atCursor`, the pointer reappears where the game's cursor is. It's moved
+// before relative mode ends, because Wayland moves only a locked pointer.
+void dxinput_release_mouse(bool atCursor)
+{
+    if (!gMouseCaptured) {
+        return;
+    }
+
+    if (atCursor) {
+        int x;
+        int y;
+        mouse_get_position(&x, &y);
+
+        int windowX;
+        int windowY;
+        SDL_RenderLogicalToWindow(gSdlRenderer, static_cast<float>(x), static_cast<float>(y), &windowX, &windowY);
+        SDL_WarpMouseInWindow(gSdlWindow, windowX, windowY);
+    }
+
+    SDL_SetRelativeMouseMode(SDL_FALSE);
+
+    // The game draws its own cursor, so the desktop's shows only while it's
+    // the desktop's pointer.
+    SDL_ShowCursor(SDL_ENABLE);
+    gMouseCaptured = false;
+    SDL_SetWindowTitle(gSdlWindow, GNW95_title);
+}
+
+bool dxinput_mouse_is_captured()
+{
+    return gMouseCaptured;
 }
 
 // 0x4E078C
@@ -165,6 +222,14 @@ void handleMouseEvent(SDL_Event* event)
 {
     // Mouse movement and buttons are accumulated in SDL itself and will be
     // processed later in `mouseDeviceGetData` via `SDL_GetRelativeMouseState`.
+
+    // CE: A click in the window takes the pointer back, and goes no further.
+    if (event->type == SDL_MOUSEBUTTONDOWN && !gMouseCaptured) {
+        if (dxinput_capture_mouse()) {
+            gMouseSwallowClick = true;
+        }
+        return;
+    }
 
     if (event->type == SDL_MOUSEWHEEL) {
         gMouseWheelDeltaX += event->wheel.x;

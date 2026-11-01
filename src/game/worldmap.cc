@@ -41,6 +41,7 @@
 #include "plib/db/db.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
+#include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/input.h"
@@ -1292,18 +1293,23 @@ int world_map(WorldMapContext ctx)
 
             scroll_dx = 0;
             scroll_dy = 0;
-            if (abs_mouse_x == 0) {
+
+            // CE: Edge-scroll only while the game has the pointer; see
+            // `gmouse_check_scrolling`.
+            bool captured = dxinput_mouse_is_captured();
+
+            if (captured && abs_mouse_x == 0) {
                 scroll_dx = -1;
                 autofollow = 0;
-            } else if (abs_mouse_x == screenGetWidth() - 1) {
+            } else if (captured && abs_mouse_x == screenGetWidth() - 1) {
                 scroll_dx = 1;
                 autofollow = 0;
             }
 
-            if (abs_mouse_y == 0) {
+            if (captured && abs_mouse_y == 0) {
                 scroll_dy = -1;
                 autofollow = 0;
-            } else if (abs_mouse_y == screenGetHeight() - 1) {
+            } else if (captured && abs_mouse_y == screenGetHeight() - 1) {
                 scroll_dy = 1;
                 autofollow = 0;
             }
