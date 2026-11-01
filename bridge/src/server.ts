@@ -162,7 +162,8 @@ export class Bridge {
     }
 
     await this.refreshTools();
-    return text(`The game is running (${this.#access} mode). ${this.#describeTools()}`);
+    const god = this.config.god ? ", god mode: your attacks always hit and kill, and you take no damage" : "";
+    return text(`The game is running (${this.#access} mode${god}). ${this.#describeTools()}`);
   }
 
   async #quit(): Promise<CallToolResult> {

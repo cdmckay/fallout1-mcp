@@ -1,7 +1,7 @@
 return function(core)
     core.tool({
         name = "ping",
-        description = "Checks that the game is running and answering. Returns the frame count, whether the game window has focus (the game runs either way), whether this is fair or omniscient mode, and the game's speed (turbo, 1 for normal).",
+        description = "Checks that the game is running and answering. Returns the frame count, whether the game window has focus (the game runs either way), whether this is fair or omniscient mode, the game's speed (turbo, 1 for normal), and whether god mode is on (god: your attacks always hit and kill, and you take no damage; for testing).",
         run = function()
             return {
                 data = {
@@ -10,6 +10,7 @@ return function(core)
                     window_focused = fo.window_focused(),
                     access = core.access(),
                     turbo = fo.turbo(),
+                    god = fo.god(),
                 },
             }
         end,

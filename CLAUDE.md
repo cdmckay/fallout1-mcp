@@ -41,6 +41,7 @@ MCP is off unless the game starts with these set:
 - `FALLOUT_MCP_LUA`: the repo's `lua/` directory.
 - `FALLOUT_MCP_OMNISCIENT=1`: optional, for omniscient mode.
 - `FALLOUT_MCP_TURBO=<1..16>`: optional, for development. The engine's clock (`get_time`, a `ScaledClock`) runs that many times faster, and the frame limiter rises with it. Movies and sound keep real time.
+- `FALLOUT_MCP_GOD=1`: optional, for testing. The player's attacks always hit and kill, and the player takes no damage from anything, so a session checking something else isn't held up by fights. `ping` and `launch_game` say when it's on. Never use it for play tests.
 - `FALLOUT_MCP_FOLLOW=0`: optional. By default the view recenters on the player whenever they move, so someone watching can follow the agent. A view panned with the arrow keys stays put until the player moves.
 - `FALLOUT_MCP_TITLE=<label>`: optional. Adds what the game is for to its window title (`FALLOUT - Checking what happens when I click on the world map`), so whoever is watching knows. The bridge sets it from `launch_game`'s `purpose`, or else from this variable, or else from its unit's name (see below). The `show_status` tool adds what's happening right now after it.
 

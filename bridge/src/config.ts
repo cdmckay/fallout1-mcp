@@ -22,6 +22,9 @@ export interface Config {
   // Turbo mode, for development: the game runs this many times faster than
   // real time (1 to 16; 1 is normal speed).
   turbo: number;
+  // God mode, for testing: the player's attacks always hit and kill, and the
+  // player takes no damage. Fixed for the bridge's lifetime, like omniscient.
+  god: boolean;
   // "systemd" runs the game as a transient user unit (Linux); "direct"
   // spawns it as a child process.
   launcher: "systemd" | "direct";
@@ -62,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: env.FALLOUT_DATA_DIR ?? join(homedir(), ".local", "share", "fallout1-mcp"),
     omniscient: env.FALLOUT_MCP_OMNISCIENT === "1",
     turbo,
+    god: env.FALLOUT_MCP_GOD === "1",
     launcher: launcher ?? (process.platform === "linux" && Bun.which("systemd-run") ? "systemd" : "direct"),
     unit,
     title,

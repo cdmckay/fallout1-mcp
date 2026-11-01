@@ -61,6 +61,12 @@ int fake_turbo(lua_State* L)
     return 1;
 }
 
+int fake_god(lua_State* L)
+{
+    lua_pushboolean(L, 0);
+    return 1;
+}
+
 // The `fo` table the engine installs, with fakes for the engine state.
 void register_fake_bindings(lua_State* L)
 {
@@ -72,6 +78,7 @@ void register_fake_bindings(lua_State* L)
         { "reload", fake_reload },
         { "window_focused", fake_window_focused },
         { "turbo", fake_turbo },
+        { "god", fake_god },
         { nullptr, nullptr },
     };
     luaL_newlib(L, functions);

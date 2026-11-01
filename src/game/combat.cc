@@ -30,6 +30,7 @@
 #include "game/stat.h"
 #include "game/tile.h"
 #include "game/trait.h"
+#include "mcp/mcp.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/db/db.h"
@@ -2876,6 +2877,16 @@ static int compute_attack(Attack* attack)
         }
     }
 
+    // MCP: God mode, for testing (FALLOUT_MCP_GOD=1): the player always hits,
+    // and whatever attacks the player misses.
+    if (mcp_god_mode()) {
+        if (attack->attacker == obj_dude && roll != ROLL_CRITICAL_SUCCESS) {
+            roll = ROLL_SUCCESS;
+        } else if (attack->defender == obj_dude) {
+            roll = ROLL_FAILURE;
+        }
+    }
+
     switch (roll) {
     case ROLL_CRITICAL_SUCCESS:
         damage_multiplier = attack_crit_success(attack);
@@ -2883,6 +2894,14 @@ static int compute_attack(Attack* attack)
     case ROLL_SUCCESS:
         attack->attackerFlags |= DAM_HIT;
         compute_damage(attack, roundsHitMainTarget, damage_multiplier);
+
+        // MCP: ...and every hit the player lands kills.
+        if (mcp_god_mode()
+            && attack->attacker == obj_dude
+            && PID_TYPE(attack->defender->pid) == OBJ_TYPE_CRITTER
+            && attack->defenderDamage < critter_get_hits(attack->defender)) {
+            attack->defenderDamage = critter_get_hits(attack->defender);
+        }
         break;
     case ROLL_FAILURE:
         if (weapon_subtype == ATTACK_TYPE_RANGED || weapon_subtype == ATTACK_TYPE_THROW) {

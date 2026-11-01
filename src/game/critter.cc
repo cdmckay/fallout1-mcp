@@ -25,6 +25,7 @@
 #include "game/tile.h"
 #include "game/trait.h"
 #include "game/worldmap.h"
+#include "mcp/mcp.h"
 #include "platform_compat.h"
 #include "plib/gnw/debug.h"
 #include "plib/gnw/memory.h"
@@ -237,6 +238,12 @@ int critter_get_hits(Object* critter)
 // 0x427AA0
 int critter_adjust_hits(Object* critter, int hp)
 {
+    // MCP: In god mode the player takes no damage, from anything: traps,
+    // explosions and poison as well as attacks.
+    if (hp < 0 && critter == obj_dude && mcp_god_mode()) {
+        return 0;
+    }
+
     int maximumHp = stat_level(critter, STAT_MAXIMUM_HIT_POINTS);
     int newHp = critter->data.critter.hp + hp;
 

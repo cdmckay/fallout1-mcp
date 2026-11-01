@@ -11,6 +11,10 @@ bool mcp_init();
 void mcp_exit();
 bool mcp_is_enabled();
 
+// God mode, for testing (FALLOUT_MCP_GOD=1): the player hits and kills with
+// every attack and takes no damage. Off unless MCP is on.
+bool mcp_god_mode();
+
 // Services the socket and the Lua scheduler. Called once per frame from
 // process_bk, which can nest when a command opens a screen.
 void mcp_tick();

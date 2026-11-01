@@ -63,6 +63,12 @@ test("the window title's label comes from the unit unless given", () => {
   expect(loadConfig({ FALLOUT_MCP_TITLE: "play test 3" }).title).toBe("play test 3");
 });
 
+test("god mode needs exactly 1", () => {
+  expect(loadConfig({}).god).toBe(false);
+  expect(loadConfig({ FALLOUT_MCP_GOD: "1" }).god).toBe(true);
+  expect(loadConfig({ FALLOUT_MCP_GOD: "yes" }).god).toBe(false);
+});
+
 test("an unknown launcher is rejected", () => {
   expect(() => loadConfig({ FALLOUT_MCP_LAUNCHER: "docker" })).toThrow(/systemd.*direct/);
 });

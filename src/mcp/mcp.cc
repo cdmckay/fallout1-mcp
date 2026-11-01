@@ -28,6 +28,9 @@ static bool gMcpOmniscient = false;
 // Whether the view follows the player; FALLOUT_MCP_FOLLOW=0 turns it off.
 static bool gMcpFollow = true;
 
+// God mode; see `mcp_god_mode`.
+static bool gMcpGod = false;
+
 // The window title before any status: the game's own, plus what this game is
 // for (FALLOUT_MCP_TITLE), if anything. See `fo_set_status`.
 static std::string gMcpBaseTitle;
@@ -129,6 +132,13 @@ static int fo_turbo(lua_State* L)
     return 1;
 }
 
+// fo.god(): whether god mode is on; see `mcp_god_mode`.
+static int fo_god(lua_State* L)
+{
+    lua_pushboolean(L, gMcpGod);
+    return 1;
+}
+
 // fo.set_status(text): shows what the agent is doing in the window title, after
 // the game's label, for whoever is watching ("FALLOUT - walking: into the
 // rats"). An empty text leaves just the label.
@@ -161,6 +171,7 @@ static void mcp_register_bindings(lua_State* L)
         { "ticks", fo_ticks },
         { "omniscient", fo_omniscient },
         { "turbo", fo_turbo },
+        { "god", fo_god },
         { "set_status", fo_set_status },
         { "reload", fo_reload },
         { nullptr, nullptr },
@@ -249,6 +260,9 @@ bool mcp_init()
     const char* follow = getenv("FALLOUT_MCP_FOLLOW");
     gMcpFollow = follow == nullptr || strcmp(follow, "0") != 0;
 
+    const char* god = getenv("FALLOUT_MCP_GOD");
+    gMcpGod = god != nullptr && strcmp(god, "1") == 0;
+
     // What this game is for, in its window title ("FALLOUT - walking"), so
     // games running side by side can be told apart.
     const char* label = getenv("FALLOUT_MCP_TITLE");
@@ -262,7 +276,7 @@ bool mcp_init()
     gMcpBaseTitle = GNW95_title;
 
     gMcpEnabled = true;
-    mcp_log("%s on %s, %s mode, %ux speed%s", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale(), gMcpFollow ? ", following the player" : "");
+    mcp_log("%s on %s, %s mode, %ux speed%s%s", LUA_RELEASE, socketPath, gMcpOmniscient ? "omniscient" : "fair", get_time_scale(), gMcpFollow ? ", following the player" : "", gMcpGod ? ", god mode" : "");
     return true;
 }
 
@@ -280,6 +294,11 @@ void mcp_exit()
 bool mcp_is_enabled()
 {
     return gMcpEnabled;
+}
+
+bool mcp_god_mode()
+{
+    return gMcpEnabled && gMcpGod;
 }
 
 void mcp_tick()
