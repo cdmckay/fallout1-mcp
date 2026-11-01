@@ -5,6 +5,39 @@ local json = require("lib.dkjson")
 
 local support = {}
 
+-- Fills in the state view's bindings with an empty world: no critters, no
+-- exits, no messages, no fight, nothing on screen. Tests override what they
+-- need on top.
+function support.quiet_world()
+    fo.critters = function()
+        return {}
+    end
+    fo.exits = function()
+        return {}
+    end
+    fo.messages = function()
+        return {}, 0
+    end
+    fo.combat = function()
+        return nil
+    end
+    fo.awareness = function()
+        return false
+    end
+    fo.tile_center = function()
+        return nil
+    end
+    fo.tile_distance = function(a, b)
+        return math.abs(a - b)
+    end
+    fo.tile_direction = function()
+        return 0
+    end
+    fo.map_name = function(index)
+        return index <= 0 and "the world map" or ("map " .. index)
+    end
+end
+
 -- Returns a fresh core and a fake engine. `options.omniscient` sets the mode.
 function support.new(options)
     options = options or {}
@@ -35,8 +68,15 @@ function support.new(options)
             engine.reload_id = id
         end,
     }
+    support.quiet_world()
 
-    package.loaded["mcp.core"] = nil
+    -- Fresh modules, so no state (a message cursor, a running request)
+    -- carries over from another test.
+    for name in pairs(package.loaded) do
+        if name:match("^mcp%.") or name:match("^tools%.") then
+            package.loaded[name] = nil
+        end
+    end
     local core = require("mcp.core")
 
     function engine.request(request)

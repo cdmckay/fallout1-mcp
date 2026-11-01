@@ -13,11 +13,15 @@
 #include "game/editor.h"
 #include "game/gconfig.h"
 #include "game/gdialog.h"
+#include "game/intface.h"
+#include "game/item.h"
 #include "game/main.h"
 #include "game/mainmenu.h"
 #include "game/map.h"
+#include "game/message.h"
 #include "game/object.h"
 #include "game/perk.h"
+#include "game/proto.h"
 #include "game/proto_types.h"
 #include "game/scripts.h"
 #include "game/select.h"
@@ -25,6 +29,8 @@
 #include "game/tile.h"
 #include "game/worldmap.h"
 #include "int/movie.h"
+#include "mcp/mcp.h"
+#include "mcp/message_log.h"
 #include "mcp/png.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
@@ -326,6 +332,312 @@ static int fo_exits(lua_State* L)
     return 1;
 }
 
+// Everything the message window has shown, numbered.
+static MessageLog gMessages(500);
+
+void mcp_record_message(const char* text)
+{
+    if (text != nullptr) {
+        gMessages.add(text);
+    }
+}
+
+// fo.messages(after): the message window's lines numbered after `after`, as
+// { seq, text } oldest first, then the newest number.
+static int fo_messages(lua_State* L)
+{
+    long long after = luaL_optinteger(L, 1, 0);
+
+    auto lines = gMessages.since(after);
+    lua_createtable(L, static_cast<int>(lines.size()), 0);
+    for (size_t i = 0; i < lines.size(); i++) {
+        lua_createtable(L, 0, 2);
+        set_int(L, "seq", lines[i].first);
+        set_string(L, "text", lines[i].second.c_str());
+        lua_rawseti(L, -2, static_cast<lua_Integer>(i + 1));
+    }
+
+    lua_pushinteger(L, gMessages.latest());
+    return 2;
+}
+
+static const char* hit_mode_name(int hitMode)
+{
+    switch (hitMode) {
+    case HIT_MODE_LEFT_WEAPON_PRIMARY:
+    case HIT_MODE_RIGHT_WEAPON_PRIMARY:
+        return "primary";
+    case HIT_MODE_LEFT_WEAPON_SECONDARY:
+    case HIT_MODE_RIGHT_WEAPON_SECONDARY:
+        return "secondary";
+    case HIT_MODE_LEFT_WEAPON_RELOAD:
+    case HIT_MODE_RIGHT_WEAPON_RELOAD:
+        return "reload";
+    case HIT_MODE_KICK:
+        return "kick";
+    default:
+        // Every unarmed punch, whatever its level.
+        return "punch";
+    }
+}
+
+static const char* bad_shot_reason(int rc)
+{
+    switch (rc) {
+    case COMBAT_BAD_SHOT_NO_AMMO:
+        return "out of ammo";
+    case COMBAT_BAD_SHOT_OUT_OF_RANGE:
+        return "out of range";
+    case COMBAT_BAD_SHOT_NOT_ENOUGH_AP:
+        return "not enough AP";
+    case COMBAT_BAD_SHOT_ALREADY_DEAD:
+        return "already dead";
+    case COMBAT_BAD_SHOT_AIM_BLOCKED:
+        return "your aim is blocked";
+    case COMBAT_BAD_SHOT_ARM_CRIPPLED:
+        return "a crippled arm can't use a two-handed weapon";
+    case COMBAT_BAD_SHOT_BOTH_ARMS_CRIPPLED:
+        return "both arms are crippled";
+    default:
+        return nullptr;
+    }
+}
+
+// The health word the game's examine text uses ("almost dead" up to
+// "unhurt"), from the same buckets as `obj_examine_func`.
+static const char* health_description(Object* critter)
+{
+    int maximum = stat_level(critter, STAT_MAXIMUM_HIT_POINTS);
+    int current = stat_level(critter, STAT_CURRENT_HIT_POINTS);
+
+    int bucket;
+    if (current <= 0 || critter_is_dead(critter)) {
+        bucket = 0;
+    } else if (current >= maximum) {
+        bucket = 4;
+    } else {
+        bucket = (current * 3) / maximum + 1;
+    }
+
+    MessageListItem item;
+    item.num = 500 + bucket;
+    return message_search(&proto_main_msg_file, &item) ? item.text : nullptr;
+}
+
+// fo.combat(): nil outside combat; otherwise whose turn it is, whether the
+// player can act, AP and free-move AP, whether anything is still playing
+// out, and the attack the interface has selected.
+static int fo_combat(lua_State* L)
+{
+    if (!in_game() || !isInCombat()) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    Object* turn = combat_whose_turn();
+    bool playerTurn = turn == obj_dude;
+
+    lua_createtable(L, 0, 7);
+    set_string(L, "turn", turn != nullptr ? object_name(turn) : nullptr);
+    set_bool(L, "player_turn", playerTurn);
+    set_bool(L, "can_act", playerTurn && (combat_state & COMBAT_STATE_0x02) != 0);
+    set_bool(L, "animating", combat_is_animating() || anim_busy(obj_dude) != 0);
+    set_int(L, "ap", obj_dude->data.critter.combat.ap);
+    set_int(L, "free_move", combat_free_move);
+
+    int hitMode;
+    bool aiming;
+    if (intface_get_attack(&hitMode, &aiming) != -1) {
+        Object* weapon = item_hit_with(obj_dude, hitMode);
+        lua_createtable(L, 0, 5);
+        set_int(L, "hit_mode", hitMode);
+        set_string(L, "mode", hit_mode_name(hitMode));
+        set_bool(L, "aiming", aiming);
+        set_int(L, "ap_cost", item_w_mp_cost(obj_dude, hitMode, aiming));
+        set_int(L, "range", item_w_range(obj_dude, hitMode));
+        set_string(L, "weapon", weapon != nullptr ? object_name(weapon) : "unarmed");
+        lua_setfield(L, -2, "attack");
+    }
+
+    return 1;
+}
+
+// fo.critters(): every critter on the player's elevation but the player,
+// with everything the views might show. lua/mcp/state.lua decides which
+// critters and fields a player would see.
+static int fo_critters(lua_State* L)
+{
+    if (!in_game()) {
+        return luaL_error(L, "no game in progress");
+    }
+
+    int hitMode = -1;
+    bool aiming = false;
+    bool canAttack = isInCombat() && intface_get_attack(&hitMode, &aiming) != -1;
+
+    // Collected first: the object cursor is shared, and the hit-chance code
+    // below shouldn't be trusted not to move it.
+    std::vector<Object*> critters;
+    for (Object* obj = obj_find_first_at(obj_dude->elevation); obj != nullptr; obj = obj_find_next_at()) {
+        if (obj != obj_dude && PID_TYPE(obj->pid) == OBJ_TYPE_CRITTER) {
+            critters.push_back(obj);
+        }
+    }
+
+    lua_createtable(L, static_cast<int>(critters.size()), 0);
+    int count = 0;
+
+    for (Object* obj : critters) {
+        lua_createtable(L, 0, 14);
+        set_int(L, "id", obj->id);
+        set_string(L, "name", object_name(obj));
+        set_int(L, "tile", obj->tile);
+        set_bool(L, "hidden", (obj->flags & OBJECT_HIDDEN) != 0);
+        set_bool(L, "dead", critter_is_dead(obj));
+        set_bool(L, "knocked_down", (obj->data.critter.combat.results & DAM_KNOCKED_DOWN) != 0);
+        set_bool(L, "crippled", critter_is_crippled(obj));
+        set_bool(L, "hostile", obj->data.critter.combat.team != obj_dude->data.critter.combat.team);
+        set_int(L, "hp", stat_level(obj, STAT_CURRENT_HIT_POINTS));
+        set_int(L, "max_hp", stat_level(obj, STAT_MAXIMUM_HIT_POINTS));
+        set_string(L, "health", health_description(obj));
+
+        if (canAttack && !critter_is_dead(obj)) {
+            int rc = combat_check_bad_shot(obj_dude, obj, hitMode, aiming);
+            set_int(L, "hit_chance", determine_to_hit(obj_dude, obj, HIT_LOCATION_UNCALLED, hitMode));
+            set_bool(L, "can_attack", rc == COMBAT_BAD_SHOT_OK);
+            set_string(L, "why_not", bad_shot_reason(rc));
+        }
+
+        lua_rawseti(L, -2, ++count);
+    }
+
+    return 1;
+}
+
+// fo.awareness(): whether the player has the Awareness perk, which makes
+// examining a critter show its exact HP and weapon.
+static int fo_awareness(lua_State* L)
+{
+    lua_pushboolean(L, perk_level(PERK_AWARENESS) > 0);
+    return 1;
+}
+
+static Object* find_critter(int id)
+{
+    for (Object* obj = obj_find_first_at(obj_dude->elevation); obj != nullptr; obj = obj_find_next_at()) {
+        if (obj->id == id && PID_TYPE(obj->pid) == OBJ_TYPE_CRITTER && obj != obj_dude) {
+            return obj;
+        }
+    }
+    return nullptr;
+}
+
+// fo.attack(id): during the player's turn, attacks critter `id` with the
+// interface's selected attack, as clicking it in combat does
+// (`combat_attack_this` without the called-shot screen). Returns true, or
+// false and why not.
+static int fo_attack(lua_State* L)
+{
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    if (!in_game() || !isInCombat()) {
+        return luaL_error(L, "not in combat");
+    }
+
+    Object* target = find_critter(id);
+    if (target == nullptr) {
+        lua_pushboolean(L, false);
+        lua_pushfstring(L, "there's no critter %d here", id);
+        return 2;
+    }
+
+    if (combat_whose_turn() != obj_dude || (combat_state & COMBAT_STATE_0x02) == 0) {
+        lua_pushboolean(L, false);
+        lua_pushstring(L, "it isn't your turn");
+        return 2;
+    }
+
+    int hitMode;
+    bool aiming;
+    if (intface_get_attack(&hitMode, &aiming) == -1) {
+        lua_pushboolean(L, false);
+        lua_pushstring(L, "there's no attack selected");
+        return 2;
+    }
+
+    if (hitMode == HIT_MODE_LEFT_WEAPON_RELOAD || hitMode == HIT_MODE_RIGHT_WEAPON_RELOAD) {
+        lua_pushboolean(L, false);
+        lua_pushstring(L, "the selected mode is reload; press n to change mode");
+        return 2;
+    }
+
+    if (aiming) {
+        lua_pushboolean(L, false);
+        lua_pushstring(L, "aimed shots aren't supported yet; press n to change mode");
+        return 2;
+    }
+
+    int rc = combat_check_bad_shot(obj_dude, target, hitMode, false);
+    if (rc != COMBAT_BAD_SHOT_OK) {
+        lua_pushboolean(L, false);
+        lua_pushstring(L, bad_shot_reason(rc));
+        return 2;
+    }
+
+    lua_pushboolean(L, combat_attack(obj_dude, target, hitMode, HIT_LOCATION_UNCALLED) == 0);
+    return 1;
+}
+
+// fo.approach(id, reserve_ap): moves the player up next to critter `id`, the
+// way the game walks up to something it's about to use. In combat it spends
+// AP but keeps `reserve_ap` back, as the game's Ctrl-move keeps AP for an
+// attack. Returns whether the engine took the move.
+static int fo_approach(lua_State* L)
+{
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    lua_Integer reserve = luaL_optinteger(L, 2, 0);
+    if (!in_game()) {
+        return luaL_error(L, "no game in progress");
+    }
+
+    Object* target = find_critter(id);
+    if (target == nullptr) {
+        return luaL_error(L, "there's no critter %d here", id);
+    }
+
+    int actionPoints = -1;
+    if (isInCombat()) {
+        actionPoints = combat_free_move + obj_dude->data.critter.combat.ap - static_cast<int>(reserve);
+        if (actionPoints <= 0) {
+            lua_pushboolean(L, false);
+            return 1;
+        }
+    }
+
+    register_begin(ANIMATION_REQUEST_RESERVED);
+    register_object_move_to_object(obj_dude, target, actionPoints, 0);
+    lua_pushboolean(L, register_end() == 0);
+    return 1;
+}
+
+// fo.start_fight(id): outside combat, attacks critter `id`, which starts
+// combat. This runs the whole combat loop, returning only when the fight is
+// over, so Lua must `post` it rather than call it from a request.
+static int fo_start_fight(lua_State* L)
+{
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    if (!in_game() || isInCombat()) {
+        return luaL_error(L, "already in combat, or no game in progress");
+    }
+
+    Object* target = find_critter(id);
+    if (target == nullptr) {
+        return luaL_error(L, "there's no critter %d here", id);
+    }
+
+    combat_attack_this(target);
+    return 0;
+}
+
 // fo.map_name(index): a map's name as the game shows it.
 static int fo_map_name(lua_State* L)
 {
@@ -363,6 +675,13 @@ void mcp_register_engine_bindings(lua_State* L)
         { "tile_direction", fo_tile_direction },
         { "exits", fo_exits },
         { "map_name", fo_map_name },
+        { "messages", fo_messages },
+        { "combat", fo_combat },
+        { "critters", fo_critters },
+        { "awareness", fo_awareness },
+        { "attack", fo_attack },
+        { "approach", fo_approach },
+        { "start_fight", fo_start_fight },
         { nullptr, nullptr },
     };
 

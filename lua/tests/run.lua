@@ -9,6 +9,7 @@ local root = arg[0]:match("^(.*)/tests/run%.lua$") or "."
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. package.path
 
 local files = {
+    "tests.combat_test",
     "tests.core_test",
     "tests.input_test",
     "tests.movement_test",

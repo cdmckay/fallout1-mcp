@@ -4754,4 +4754,11 @@ void combat_delete_critter(Object* obj)
     combatai_delete_critter(obj);
 }
 
+// MCP: Whether attacks or turns are still playing out, so an agent's action
+// can wait for them to finish.
+bool combat_is_animating()
+{
+    return combat_turn_running > 0;
+}
+
 } // namespace fallout

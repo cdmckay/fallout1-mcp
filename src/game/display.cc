@@ -7,6 +7,7 @@
 #include "game/gmouse.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "mcp/mcp.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/gnw.h"
@@ -195,6 +196,9 @@ void display_print(char* str)
     if (!disp_init) {
         return;
     }
+
+    // MCP: The agent reads the message window through this.
+    mcp_record_message(str);
 
     int oldFont = text_curr();
     text_font(DISPLAY_MONITOR_FONT);

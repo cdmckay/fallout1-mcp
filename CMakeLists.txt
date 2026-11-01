@@ -282,6 +282,8 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/lua_host.h"
     "src/mcp/mcp.cc"
     "src/mcp/mcp.h"
+    "src/mcp/message_log.cc"
+    "src/mcp/message_log.h"
     "src/mcp/png.cc"
     "src/mcp/png.h"
     "src/mcp/socket_server.cc"

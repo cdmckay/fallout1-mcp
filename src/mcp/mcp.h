@@ -15,6 +15,10 @@ bool mcp_is_enabled();
 // process_bk, which can nest when a command opens a screen.
 void mcp_tick();
 
+// Keeps a line the game printed to its message window, for the agent's views.
+// Called from display_print.
+void mcp_record_message(const char* text);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_MCP_H_ */

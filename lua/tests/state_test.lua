@@ -9,51 +9,58 @@ local function fresh_state()
     return require("mcp.state")
 end
 
--- A fake game with the player on tile 100 and the given flags, exits and
--- on-screen tiles. Tiles are numbered so that distance is just the
--- difference, and every exit lies to the west.
+-- A fake game with the player on tile 100 and the given flags, exits,
+-- critters, fight and on-screen tiles. Tiles are numbered so that distance is
+-- just the difference, and everything lies to the west.
 local function fake_game(options)
     options = options or {}
     local on_screen = options.on_screen or {}
-    _G.fo = {
-        flags = function()
-            return options.flags or { in_game = true }
-        end,
-        player = function()
-            if options.no_player then
-                return nil
-            end
-            return { name = "Max Stone", hp = 30, max_hp = 30, tile = 100 }
-        end,
-        omniscient = function()
-            return options.omniscient or false
-        end,
-        tile_center = function(tile)
-            if tile == 100 then
-                if options.player_screen then
-                    return table.unpack(options.player_screen)
-                end
-                return nil
-            end
-            local point = on_screen[tile]
-            if point then
-                return point[1], point[2]
+    _G.fo = {}
+    support.quiet_world()
+
+    fo.flags = function()
+        return options.flags or { in_game = true }
+    end
+    fo.player = function()
+        if options.no_player then
+            return nil
+        end
+        return { name = "Max Stone", hp = 30, max_hp = 30, tile = 100 }
+    end
+    fo.omniscient = function()
+        return options.omniscient or false
+    end
+    fo.awareness = function()
+        return options.awareness or false
+    end
+    fo.tile_center = function(tile)
+        if tile == 100 then
+            if options.player_screen then
+                return table.unpack(options.player_screen)
             end
             return nil
-        end,
-        exits = function()
-            return options.exits or {}
-        end,
-        tile_distance = function(a, b)
-            return math.abs(a - b)
-        end,
-        tile_direction = function()
-            return 4
-        end,
-        map_name = function(index)
-            return index <= 0 and "the world map" or ("map " .. index)
-        end,
-    }
+        end
+        local point = on_screen[tile]
+        if point then
+            return point[1], point[2]
+        end
+        return nil
+    end
+    fo.exits = function()
+        return options.exits or {}
+    end
+    fo.critters = function()
+        return options.critters or {}
+    end
+    fo.combat = function()
+        return options.combat
+    end
+    fo.tile_direction = function()
+        return 4
+    end
+    if options.messages then
+        fo.messages = options.messages
+    end
 end
 
 function tests.no_flags_is_an_unknown_screen()
@@ -156,6 +163,127 @@ function tests.omniscient_mode_lists_every_exit()
 
     equal(#exits, 2, "exits listed")
     equal(exits[1].to, "map 9", "nearest first")
+end
+
+local RAT = {
+    id = 7,
+    name = "Rat",
+    tile = 95,
+    hidden = false,
+    dead = false,
+    hostile = true,
+    hp = 4,
+    max_hp = 9,
+    health = "wounded",
+    hit_chance = 87,
+    can_attack = true,
+}
+
+local function critter(overrides)
+    local c = {}
+    for k, v in pairs(RAT) do
+        c[k] = v
+    end
+    for k, v in pairs(overrides or {}) do
+        c[k] = v
+    end
+    return c
+end
+
+function tests.fair_play_shows_critters_on_screen_with_a_health_word_not_hp()
+    local state = fresh_state()
+    fake_game({
+        critters = {
+            critter(),
+            critter({ id = 8, tile = 60 }), -- off screen
+            critter({ id = 9, tile = 96, hidden = true }), -- hidden
+            critter({ id = 10, tile = 97, dead = true }), -- dead
+        },
+        on_screen = { [95] = { 400, 300 }, [96] = { 410, 300 }, [97] = { 420, 300 } },
+    })
+
+    local critters = state.view().critters
+
+    equal(#critters, 1, "critters listed")
+    equal(critters[1].id, 7, "the rat on screen")
+    equal(critters[1].health, "wounded", "health word")
+    equal(critters[1].hp, nil, "exact hp")
+    equal(critters[1].distance, 5, "distance")
+    equal(critters[1].hit_chance, nil, "no odds outside combat")
+    equal(critters[1].hostile, nil, "no hostility outside combat")
+end
+
+function tests.awareness_or_omniscience_shows_exact_hp()
+    local state = fresh_state()
+    fake_game({ awareness = true, critters = { critter() }, on_screen = { [95] = { 400, 300 } } })
+    equal(state.view().critters[1].hp, 4, "hp with awareness")
+
+    state = fresh_state()
+    fake_game({ omniscient = true, critters = { critter({ tile = 60 }) } })
+    local critters = state.view().critters
+    equal(#critters, 1, "off-screen critter in omniscient mode")
+    equal(critters[1].max_hp, 9, "max hp in omniscient mode")
+end
+
+function tests.combat_shows_the_turn_the_attack_and_the_odds_against_each_critter()
+    local state = fresh_state()
+    fake_game({
+        flags = { in_game = true, combat = true },
+        combat = {
+            turn = "Max Stone",
+            can_act = true,
+            animating = false,
+            ap = 6,
+            free_move = 0,
+            attack = { weapon = "unarmed", mode = "punch", ap_cost = 3, aiming = false },
+        },
+        critters = {
+            critter({ id = 7, tile = 95 }),
+            critter({ id = 8, tile = 98, hit_chance = 40, can_attack = false, why_not = "not enough AP" }),
+        },
+        on_screen = { [95] = { 400, 300 }, [98] = { 430, 300 } },
+    })
+
+    local view = state.view()
+
+    equal(view.mode, "combat", "mode")
+    equal(view.combat.your_turn, true, "your turn")
+    equal(view.combat.ap, 6, "ap")
+    equal(view.combat.free_move_ap, nil, "no free move")
+    equal(view.combat.attack.mode, "punch", "attack mode")
+    equal(view.combat.attack.ap_cost, 3, "attack cost")
+    equal(view.critters[1].id, 8, "nearest first")
+    equal(view.critters[1].can_attack, false, "can't attack")
+    equal(view.critters[1].why_not, "not enough AP", "why not")
+    equal(view.critters[2].hit_chance, 87, "hit chance")
+    equal(view.critters[2].hostile, true, "hostile")
+end
+
+function tests.each_message_reaches_the_agent_once()
+    local state = fresh_state()
+    local log = { { seq = 1, text = "old news" } }
+    fake_game({
+        messages = function(after)
+            local lines = {}
+            for _, line in ipairs(log) do
+                if line.seq > after then
+                    lines[#lines + 1] = line
+                end
+            end
+            return lines, log[#log].seq
+        end,
+    })
+
+    -- What was printed before the first view isn't replayed.
+    equal(state.view().messages, nil, "first view")
+
+    log[#log + 1] = { seq = 2, text = "You were hit for 4 hit points." }
+    log[#log + 1] = { seq = 3, text = "You hit the Rat for 6 hit points." }
+    local messages = state.view().messages
+    equal(#messages, 2, "new lines")
+    equal(messages[2], "You hit the Rat for 6 hit points.", "order")
+
+    equal(state.view().messages, nil, "nothing new")
 end
 
 function tests.exits_appear_only_while_exploring_or_fighting()

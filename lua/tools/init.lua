@@ -4,4 +4,5 @@ return function(core)
     require("tools.perception")(core)
     require("tools.input")(core)
     require("tools.movement")(core)
+    require("tools.combat")(core)
 end
