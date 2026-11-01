@@ -1,5 +1,7 @@
 # Fallout Community Edition
 
+> **This is fallout1-mcp, a modified version of [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce).** It is being adapted so that an agent can play the game through a Lua interface and an MCP server. The changes are in this repository's commit history, and it is distributed under the same [license](LICENSE.md).
+
 Fallout Community Edition is a fully working re-implementation of Fallout, with the same original gameplay, engine bugfixes, and some quality of life improvements, that works (mostly) hassle-free on multiple platforms.
 
 There is also [Fallout 2 Community Edition](https://github.com/alexbatalov/fallout2-ce).
