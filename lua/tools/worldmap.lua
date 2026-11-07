@@ -150,6 +150,7 @@ return function(core)
         if ended == "left" then
             local result, note = interruption()
             report.result = result
+            report.position, report.terrain = worldmap.last_position()
             return report, note
         end
 
@@ -174,7 +175,7 @@ return function(core)
 
     core.tool({
         name = "travel",
-        description = "Travels across the world map, as clicking a town's button or a point on the map does, and waits until the trip ends: arrival, impassable ground, or something on the way (a random encounter puts you on its map). Give a place the world map view lists (`to`, by name), or a point (`x` and `y`, in map squares as the view gives positions: 28 across, 30 down, north up). Time passes on the way. Works from the world map or the town map. Returns the state view with `travel`: where to, the result (arrived, blocked, encounter, special_encounter, interrupted, still_travelling) and the hours it took. enter then goes into the place you've arrived at.",
+        description = "Travels across the world map, as clicking a town's button or a point on the map does, and waits until the trip ends: arrival, impassable ground, or something on the way (a random encounter puts you on its map). Give a place the world map view lists (`to`, by name), or a point (`x` and `y`, in map squares as the view gives positions: 28 across, 30 down, north up). Time passes on the way. Works from the world map or the town map. Returns the state view with `travel`: where to, the result (arrived, blocked, encounter, special_encounter, interrupted, still_travelling) and the hours it took; a trip something stopped on the way also says where on the world map it stopped (`position`, in squares) and the `terrain` there. enter then goes into the place you've arrived at.",
         schema = core.schema({
             to = { type = "string", description = 'A place the world map lists, e.g. "Vault 15".' },
             x = { type = "number", minimum = 0, maximum = worldmap.COLUMNS, description = "A point to travel to: squares from the map's west edge." },
@@ -301,6 +302,7 @@ return function(core)
                 local note
                 if ended == "left" then
                     report.result, note = interruption()
+                    report.position, report.terrain = worldmap.last_position()
                 else
                     report.result = ended == "stopped" and "arrived" or ended
                     note = ("%s is in %s, so you set off there. enter again once you've arrived."):format(place, town)

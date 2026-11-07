@@ -136,6 +136,27 @@ function worldmap.view(raw)
     return view
 end
 
+-- Where the player last was on the world map, from fo.world_position(): the
+-- position in squares and the terrain. Once the map has closed, that's where
+-- they left it: the point an encounter stopped a trip, or the ground they
+-- went into. nil when no game is in progress.
+function worldmap.last_position()
+    local at = fo.world_position()
+    if at == nil then
+        return nil
+    end
+    return worldmap.point(at.x, at.y), at.terrain
+end
+
+-- The name of the ground the player last stood on on the world map, as the
+-- map shows it ("Desert", "Mountains"): an encounter map's or the open
+-- ground's, which the game gives no name of its own. nil when no game is in
+-- progress.
+function worldmap.ground()
+    local at = fo.world_position()
+    return at and at.ground or nil
+end
+
 -- The town map view: the town shown and the places on it a player can go
 -- into, or nil when it isn't up.
 function worldmap.town_map(raw)

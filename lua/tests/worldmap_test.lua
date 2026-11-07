@@ -119,6 +119,8 @@ local function setup(options)
             game.moving = false
             game.exit = options.exit or "encounter"
             open_map("Desert encounter")
+            -- Encounter maps have no name of their own.
+            game.map = { file = "DESERT1.MAP" }
             return
         end
         if options.blocked_after and game.trip_frames >= options.blocked_after then
@@ -157,7 +159,7 @@ local function setup(options)
             name = "Max Stone",
             tile = 20000,
             elevation = 0,
-            map = { file = "", name = "Vault 13" },
+            map = game.map or { file = "", name = "Vault 13" },
             date = { year = 2161, month = 12, day = 5, time = "7:21" },
         }
     end
@@ -191,6 +193,15 @@ local function setup(options)
     end
     fo.world_map_exit = function()
         return game.exit
+    end
+    fo.world_position = function()
+        local town = town_at(game.x, game.y)
+        return {
+            x = game.x,
+            y = game.y,
+            terrain = town and "city" or "desert",
+            ground = town and "City" or "Desert",
+        }
     end
     fo.game_time = function()
         return game.time
@@ -396,6 +407,35 @@ function tests.an_encounter_stops_a_trip_on_its_map()
     equal(view.travel.result, "encounter", "result")
     contains(view.note, "encounter", "note")
     equal(view.world_map, nil, "no world map")
+end
+
+function tests.an_encounter_says_where_on_the_world_map_it_stopped_the_trip()
+    local _, call = setup({ encounter_after = 8 })
+
+    local view = call("travel", { to = "Vault 15" })
+
+    -- Seven frames east of Vault 13 at 10 pixels a frame: 895 pixels.
+    equal(view.travel.position.x, 17.9, "x in squares")
+    equal(view.travel.position.y, 1.5, "y in squares")
+    equal(view.travel.terrain, "desert", "terrain")
+end
+
+function tests.an_encounter_map_is_named_after_the_ground()
+    local _, call = setup({ encounter_after = 8 })
+
+    local view = call("travel", { to = "Vault 15" })
+
+    equal(view.player.map.file, "DESERT1.MAP", "the encounter's map")
+    equal(view.player.map.name, "Desert", "named as the world map names the ground")
+end
+
+function tests.a_trip_that_arrives_needs_no_position_of_its_own()
+    local _, call = setup()
+
+    local view = call("travel", { to = "Vault 15" })
+
+    equal(view.travel.position, nil, "the world map view says where")
+    equal(view.travel.terrain, nil, "and on what")
 end
 
 function tests.an_event_on_the_way_is_an_interruption()

@@ -39,6 +39,9 @@ function support.quiet_world()
     fo.world_map = function()
         return nil
     end
+    fo.world_position = function()
+        return nil
+    end
     fo.awareness = function()
         return false
     end

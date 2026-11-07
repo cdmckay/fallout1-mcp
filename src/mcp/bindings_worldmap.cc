@@ -177,6 +177,30 @@ static int fo_world_map_exit(lua_State* L)
     return 1;
 }
 
+// fo.world_position(): where the player last was on the world map, or nil
+// when no game is in progress. That's where they are while it's up, and where
+// they left it from once it has closed: the place an encounter stopped a trip,
+// or the ground they entered. `x` and `y` are world-map pixels, `terrain` is
+// as fo.world_map() gives it, and `ground` is the ground's name as the map
+// shows it ("Desert", "Mountains").
+static int fo_world_position(lua_State* L)
+{
+    if (!mcp_in_game()) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    WorldMapStatus status;
+    worldmap_status(&status);
+
+    lua_createtable(L, 0, 4);
+    set_int(L, "x", status.x);
+    set_int(L, "y", status.y);
+    set_string(L, "terrain", terrain_name(status.terrain));
+    set_string(L, "ground", worldmap_message(1000 + status.terrain));
+    return 1;
+}
+
 // fo.game_time(): the game's clock, in tenths of a second.
 static int fo_game_time(lua_State* L)
 {
@@ -234,6 +258,7 @@ void mcp_register_worldmap_bindings(lua_State* L)
     static const luaL_Reg functions[] = {
         { "world_map", fo_world_map },
         { "world_map_exit", fo_world_map_exit },
+        { "world_position", fo_world_position },
         { "game_time", fo_game_time },
         { "world_map_travel", fo_world_map_travel },
         { "world_map_enter", fo_world_map_enter },

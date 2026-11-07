@@ -41,6 +41,9 @@ void mcp_set_message_attacker(lua_State* L, long long seq);
 // same table.
 void mcp_register_object_bindings(lua_State* L);
 
+// The resting bindings (bindings_rest.cc), added to the same table.
+void mcp_register_rest_bindings(lua_State* L);
+
 } // namespace fallout
 
 #endif /* FALLOUT_MCP_BINDINGS_H_ */

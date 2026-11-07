@@ -43,7 +43,7 @@ local HINTS = {
     use_item_on = "Choosing an item to use on something; this still needs the mouse. Escape cancels.",
     loot = "Looting; `loot` below is what's there. take moves items to you by id, or everything with all: true; its close (or escape) leaves.",
     barter = "Bartering. Keys: m offers the deal on the table, t goes back to talking, escape leaves. Putting items on the table isn't supported yet.",
-    pipboy = "Pip-Boy. Escape closes it. press codes: 500 status, 501 automaps, 502 archives, 504 alarm clock (to rest).",
+    pipboy = "Pip-Boy. Escape closes it. rest rests for some hours, until a time of day or until healed, and waits until the clock stops; it works from the map too. press codes: 500 status, 501 automaps, 502 archives, 504 alarm clock.",
     options = "Options. Keys: s save, l load, p preferences, d or escape done, e quit to the main menu.",
     preferences = "Preferences. Return keeps changes, escape cancels; changing a setting still needs the mouse.",
     skilldex = "Skilldex. Escape cancels; using a skill from here isn't supported yet.",
@@ -298,6 +298,11 @@ function state.view()
         player.map, player.tile, player.elevation = nil, nil, nil
     elseif player ~= nil then
         player.screen = screen_point(player.tile)
+        -- Encounter maps and the open ground have no name of their own; the
+        -- world map calls them by the ground there.
+        if player.map ~= nil and player.map.name == nil then
+            player.map.name = worldmap.ground()
+        end
     end
 
     local view = {
@@ -310,10 +315,17 @@ function state.view()
         view.premade = fo.premade()
     end
 
+    -- The character screen's sheet says what's left to spend; elsewhere the
+    -- player does. Conditions such as poisoned ride on the player in every
+    -- view, so the agent sees them without opening the character screen.
+    local sheet = fo.character()
     if mode == "character" or mode == "perk_choice" then
-        view.character = character.sheet()
+        view.character = character.sheet(sheet)
     elseif player ~= nil then
-        player.unspent = character.unspent()
+        player.unspent = character.unspent(sheet)
+    end
+    if player ~= nil then
+        player.conditions = character.conditions(sheet)
     end
 
     if on_world_map then

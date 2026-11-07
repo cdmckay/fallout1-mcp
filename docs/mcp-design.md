@@ -115,6 +115,7 @@ Every action tool waits until the game is idle (with a timeout) and then returns
 | Dialog | `talk(npc)`, `choose(n)`, `barter(...)` | `action_talk_to`; option keys `'1'`–`'9'` (`gdialog.cc:1374`); `'b'` and `'m'` for barter |
 | Combat | `attack(target; repeat, end_turn, min_hp)`, which fights a target to the death across turns and says in `stopped_by` what stopped it short; `end_turn`, `end_combat`, `hit_chance(target)` | `combat_attack`, `determine_to_hit`, Space and Return |
 | World map | `travel(place or point)`, `enter(place)` | town buttons `500 + town`, town-map places `514 +`, and command codes for a point and the player's marker |
+| Rest | `rest(hours or until)`, which waits until the clock stops; `hurt` (omniscient only, for testing) | the Pip-Boy's `p`, its alarm clock (`504`) and the clock's choices (`510 +`); `critter_can_obj_dude_rest`; `pipboy_is_resting` |
 | Saves | `save(slot)`, `load(slot)` | `SaveSlot`/`LoadSlot` shims |
 | Lifecycle (bridge) | `launch_game`, `quit_game`, `reload_lua`, `eval_lua` (omniscient only) | — |
 
@@ -167,7 +168,7 @@ This view comes back from every combat action, and from `state` during combat.
 `state` on the map returns:
 
 - **Where:** map name, elevation, and game date and time.
-- **You:** HP, level and XP to the next level, and status.
+- **You:** HP, level and XP to the next level, and status. Built (#37): `player.conditions` names what the character screen lights up (poisoned, radiated, eye damage, crippled limbs) in every view, and is left out when there's none.
 - **Nearby**, grouped:
   - critters (with health as above, and whether they answer when talked to, below);
   - items on the ground;
@@ -191,7 +192,7 @@ The text map marks each kind with the legend's symbol: `*`, `%`, `=`, `+` and `!
 - **Barter and loot:** both sides' items with quantity, weight and value, plus the totals on offer.
 - **Inventory:** each item with its id, name, quantity, weight and slot. Each weapon has its attacks, primary then secondary, with the damage it rolls, its range, its skill and its AP cost, aimed too if it can be, all with the player's perks and traits applied; its minimum Strength; and its ammo. They're the figures the game shows once it's in a hand, on the inventory screen ("Dmg:", "Rng:") and the interface bar, and in the examine text ("Min ST:", the shots loaded), so the agent can choose a weapon without equipping each one. `unarmed` gives the same for an empty hand's punch. Built (#28).
 - **Character:** stats, skills with percentages, perks, traits, tagged skills, unspent points and carry weight. Built as the `character` tool; the state view carries the same sheet on the character screen, and elsewhere `player.unspent` says when skill points or a perk are waiting.
-- **World map:** where you are (the name the player's marker shows, the terrain, the position in map squares), whether you're travelling and where to, and the places the map's list names, with distance and direction. On the town map, the town's places a player can go into. Fallout 1 has no encounter prompt: an encounter drops you on its map, and `travel` says that's what stopped it. Built.
+- **World map:** where you are (the name the player's marker shows, the terrain, the position in map squares), whether you're travelling and where to, and the places the map's list names, with distance and direction. On the town map, the town's places a player can go into. Fallout 1 has no encounter prompt: an encounter drops you on its map, and `travel` says that's what stopped it, and where: the position in squares and the terrain (#39). Encounter maps and the open ground have no name of their own, so `player.map.name` gives the ground's, as the world map does ("Desert", "Mountains"). Built.
 
 ## Fair play, with an omniscient override
 
@@ -271,7 +272,7 @@ What follows is everything that needs the mouse today, and how each will get a m
 - The perk list needs no code: Home, Down and Return reach every perk, and Tag!'s and Mutate!'s follow-up lists work the same way. `choose_perk` uses them.
 - The Perks/Karma/Kills folder tab (`FldrButton`, `:4612`) sets `folder`. The character view lists perks whichever tab is open, so this one waits until karma or kills are needed.
 
-**Pip-Boy: command code, route 3.** On the status tab, choosing a quest location or a holodisk depends on the mouse's x position (`PipStatus`, `pipboy.cc:1002`). The new code sets that choice directly.
+**Pip-Boy: command code, route 3.** Resting needs nothing new: the alarm clock's choices are button codes, and `rest` presses them and waits while `pipboy_is_resting()`. On the status tab, choosing a quest location or a holodisk depends on the mouse's x position (`PipStatus`, `pipboy.cc:1002`). The new code sets that choice directly.
 
 **Preferences: command codes or engine calls.** Every setting is changed in `DoThing` (`options.cc:1122`), which reads the mouse, and the sliders are drag loops. This is low priority: the agent rarely needs preferences.
 
