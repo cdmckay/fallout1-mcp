@@ -30,4 +30,4 @@ CLAUDE_CONFIG_DIR=~/.claude-ultra claude --allowedTools mcp__fallout -- "$(cat d
 
 When it finishes, copy its report from the terminal. On mango, the full text is also in the newest file under `~/.claude-ultra/projects/<this repo>/`. File each limitation and bug as an issue, or as a comment on an open one, and add a row to the table above.
 
-The prompt is in [play-test-prompt.md](play-test-prompt.md). Change its goal as the game opens up: the world map and travel are next (#21 landed after play test 3).
+The prompt is in [play-test-prompt.md](play-test-prompt.md). Change its goal as the game opens up, and its number in the purpose for each run. From play test 4 it goes on past the cave to Vault 15, to cover travel and encounters (#21), the one-call fights (#19) and looting (#14).
