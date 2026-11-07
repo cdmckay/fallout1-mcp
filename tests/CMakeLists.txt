@@ -19,6 +19,7 @@ add_executable(mcp_tests
     "mcp/screens_test.cc"
     "mcp/sight_rules_test.cc"
     "mcp/socket_server_test.cc"
+    "mcp/talk_rules_test.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/combat_rules.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/line_buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/lua_host.cc"
@@ -27,6 +28,7 @@ add_executable(mcp_tests
     "${CMAKE_SOURCE_DIR}/src/mcp/screens.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/sight_rules.cc"
     "${CMAKE_SOURCE_DIR}/src/mcp/socket_server.cc"
+    "${CMAKE_SOURCE_DIR}/src/mcp/talk_rules.cc"
 )
 
 target_include_directories(mcp_tests PRIVATE "${CMAKE_SOURCE_DIR}/src" ${SDL2_INCLUDE_DIRS})

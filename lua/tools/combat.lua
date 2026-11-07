@@ -38,6 +38,10 @@ return function(core)
     -- an id the view doesn't list just as it refuses one that isn't there,
     -- so an attack can't give away a critter the player can't see.
     local function seen_critter(id)
+        -- The game can end during the others' turns: the player dies.
+        if fo.player() == nil then
+            return nil
+        end
         for _, critter in ipairs(sight.critters()) do
             if critter.id == id then
                 return critter
@@ -59,8 +63,28 @@ return function(core)
         return ids
     end
 
+    -- Hexes to a critter as the game's range checks count them, so a melee
+    -- attack reaches one at 1 even when it's a multi-hex critter.
     local function distance_to(critter)
-        return fo.tile_distance(fo.player().tile, critter.tile)
+        return fo.object_distance(critter.id)
+    end
+
+    -- The number of the player's turn in this fight, or nil outside one. It
+    -- tells turns apart where AP can't: the game ends a turn with no AP left
+    -- by itself, and the others' turns can play out before this looks again,
+    -- so the next look can be at the player's next turn, AP refilled.
+    local function turn_number()
+        local combat = fo.combat()
+        return combat ~= nil and combat.turn_number or nil
+    end
+
+    -- Waits for the player's turn after turn `number`, or the end of the
+    -- fight. Returns whether that came in time.
+    local function wait_for_turn_after(number)
+        return core.wait_until(function()
+            local combat = fo.combat()
+            return combat == nil or (combat.turn_number ~= number and combat.can_act and not combat.animating)
+        end, TURN_TIMEOUT_MS)
     end
 
     local function wait_until_still()
@@ -76,50 +100,50 @@ return function(core)
     -- in time.
     local function pass_turn()
         local combat = fo.combat()
+        local ready
         if combat ~= nil and combat.can_act then
             fo.inject(32)
             core.wait_until(function()
                 return not fo.input_pending()
             end, 5000)
-            -- The turn passes once the game has read the key.
-            core.wait_until(function()
-                local now = fo.combat()
-                return now == nil or not now.can_act
-            end, 5000)
+            ready = wait_for_turn_after(combat.turn_number)
+        else
+            ready = wait_for_player()
         end
-        local ready = wait_for_player()
         core.wait_frames(SETTLE_FRAMES)
         return ready
     end
 
-    -- The game ends a turn with no AP left by itself, a moment after the
-    -- last action, and may have already. Waits for that and for the player's
-    -- next turn (or the end of the fight), so nothing goes on as if the turn
-    -- were still on. Returns whether there was such a turn, and whether the
-    -- next came in time.
-    local function wait_out_spent_turn()
+    -- Whether the player's turn `number` is over, or about to be: the game
+    -- ends a turn with no AP left by itself, a moment after the last action,
+    -- and the others' turns may have played out since.
+    local function turn_over(number)
         local combat = fo.combat()
-        if combat == nil or (combat.can_act and combat.ap + combat.free_move > 0) then
+        return combat ~= nil and not (combat.turn_number == number and combat.can_act and combat.ap + combat.free_move > 0)
+    end
+
+    -- If the player's turn `number` is over (turn_over), waits for their next
+    -- turn (or the end of the fight), so nothing goes on as if the turn were
+    -- still on. Returns whether the turn passed, and whether the next came in
+    -- time.
+    local function wait_out_spent_turn(number)
+        if not turn_over(number) then
             return false, true
         end
-        core.wait_until(function()
-            local now = fo.combat()
-            return now == nil or not now.can_act
-        end, 5000)
-        local ready = wait_for_player()
+        local ready = wait_for_turn_after(number)
         core.wait_frames(SETTLE_FRAMES)
         return true, ready
     end
 
-    -- One attack on critter `id`, walking up to it first if it's a melee
-    -- attack and the critter is out of reach, keeping back the AP for the
-    -- attack, as the game's Ctrl-move does. Returns what happened:
-    -- "attacked", whether the player's turn came back in time, and whether
-    -- the attack used the turn's last AP, so the game passed it (see
-    -- wait_out_spent_turn); "moved" (closed in, and the fight or the target
-    -- changed on the way); "short of AP" and whether it moved; or "can't
-    -- attack", why, and whether it moved.
-    local function attack_once(id)
+    -- One attack on critter `id` during the player's turn `number`, walking
+    -- up to it first if it's a melee attack and the critter is out of reach,
+    -- keeping back the AP for the attack, as the game's Ctrl-move does.
+    -- Returns what happened: "attacked", whether the player's turn came back
+    -- in time, and whether the attack used the turn's last AP, so the game
+    -- passed it (see wait_out_spent_turn); "moved" (closed in, and the fight
+    -- or the target changed on the way); "short of AP" and whether it moved;
+    -- or "can't attack", why, and whether it moved.
+    local function attack_once(id, number)
         local combat = fo.combat()
         local target = seen_critter(id)
         local moved = false
@@ -155,15 +179,17 @@ return function(core)
         end
 
         -- Let the attack's animation start before waiting for it to end.
+        -- With no AP left the game passes the turn, and the wait can run on
+        -- through the others' turns to the player's next.
         core.wait_frames(2)
         local ready = wait_for_player()
         core.wait_frames(SETTLE_FRAMES)
         if ready then
             local passed
-            passed, ready = wait_out_spent_turn()
+            passed, ready = wait_out_spent_turn(number)
             return "attacked", ready, passed
         end
-        return "attacked", ready, false
+        return "attacked", ready, turn_over(number)
     end
 
     -- Whether the attacks should stop here: the target is dead, or something
@@ -247,9 +273,11 @@ return function(core)
         return nil
     end
 
-    local function done(fight)
+    -- The result, once the attacks stop during `turn`, if there's one to go
+    -- on; the last action may have used up its AP.
+    local function done(fight, turn)
         core.wait_frames(SETTLE_FRAMES)
-        if wait_out_spent_turn() then
+        if turn ~= nil and fight.stopped_by ~= "still waiting" and wait_out_spent_turn(turn.number) then
             fight.turns_ended = fight.turns_ended + 1
         end
         local view = state.view()
@@ -307,11 +335,25 @@ return function(core)
             fight.known[args.target] = true
             local started = fo.ticks()
 
+            -- The turn the attacks are on: its number, its attacks so far,
+            -- and whether it began during the call (fresh), with how far the
+            -- target was then.
+            local turn
+
+            -- A new turn has begun: the last one ended, by the game or by
+            -- end_turn.
+            local function next_turn()
+                fight.turns_ended = fight.turns_ended + 1
+                local now = seen_critter(fight.target)
+                turn = { number = turn_number(), attacks = 0, distance = now ~= nil and distance_to(now) or 0, fresh = true }
+            end
+
             local combat = fo.combat()
             if combat == nil then
                 -- This runs the whole fight's loop, so it has to run outside
                 -- this request; the request then follows the fight from
-                -- inside it. The opening attack is the fight's first move.
+                -- inside it. The opening attack is the fight's first move,
+                -- made in the player's first turn, which it may use up.
                 core.post(fo.start_fight, args.target)
                 if not core.wait_until(function()
                     return fo.combat() ~= nil
@@ -324,13 +366,28 @@ return function(core)
                     return done(fight)
                 end
                 core.wait_frames(SETTLE_FRAMES)
+
+                turn = { number = 1, attacks = 1, fresh = false }
+                local passed, ready = wait_out_spent_turn(turn.number)
+                if passed then
+                    next_turn()
+                    if not ready then
+                        fight.stopped_by = "still waiting"
+                        return done(fight)
+                    end
+                    if not end_turn then
+                        if not should_stop(fight) then
+                            fight.stopped_by = "out of AP"
+                        end
+                        return done(fight, turn)
+                    end
+                end
             elseif not combat.can_act then
                 core.fail("it isn't your turn: use end_turn to wait for it")
+            else
+                turn = { number = combat.turn_number, attacks = 0, fresh = false }
             end
 
-            -- Whether this turn has seen an attack, and how far the target
-            -- was when it began; a turn the call began didn't start fresh.
-            local turn = { attacks = 0, distance = distance_to(target), fresh = false }
             local moved = false
 
             while true do
@@ -341,9 +398,12 @@ return function(core)
                 end
 
                 if fight.made > 0 and not keep_on then
-                    if end_turn then
-                        fight.turns_ended = fight.turns_ended + 1
-                        if not pass_turn() then
+                    -- The one attack asked for. end_turn ends the turn after
+                    -- it, unless it used the turn up and the game passed it.
+                    if end_turn and turn.attacks > 0 then
+                        local ready = pass_turn()
+                        next_turn()
+                        if not ready then
                             fight.stopped_by = "still waiting"
                         end
                     end
@@ -354,25 +414,33 @@ return function(core)
                     break
                 end
 
-                local outcome, detail, extra = attack_once(fight.target)
+                local outcome, detail, extra = attack_once(fight.target, turn.number)
                 if outcome == "attacked" then
                     fight.made = fight.made + 1
                     turn.attacks = turn.attacks + 1
+                    if extra then
+                        -- That was the turn's last AP, and the game passed it.
+                        next_turn()
+                    end
                     if not detail then
                         fight.stopped_by = "still waiting"
                         break
                     end
                     if extra then
-                        -- That was the turn's last AP, and the game passed it.
-                        fight.turns_ended = fight.turns_ended + 1
                         if not end_turn then
                             if not should_stop(fight) then
                                 fight.stopped_by = "out of AP"
                             end
                             break
                         end
-                        local now = seen_critter(fight.target)
-                        turn = { attacks = 0, distance = now ~= nil and distance_to(now) or 0, fresh = true }
+                        -- When the attacks use up each turn, the loop is
+                        -- never short of AP, where the time is checked.
+                        if fo.ticks() - started > FIGHT_BUDGET_MS then
+                            if not should_stop(fight) then
+                                fight.stopped_by = "time limit"
+                            end
+                            break
+                        end
                     end
                 elseif outcome == "moved" then
                     moved = true
@@ -412,13 +480,12 @@ return function(core)
                         break
                     end
 
-                    fight.turns_ended = fight.turns_ended + 1
-                    if not pass_turn() then
+                    local ready = pass_turn()
+                    next_turn()
+                    if not ready then
                         fight.stopped_by = "still waiting"
                         break
                     end
-                    now = seen_critter(fight.target)
-                    turn = { attacks = 0, distance = now ~= nil and distance_to(now) or 0, fresh = true }
                     moved = true
                 end
             end
@@ -432,15 +499,16 @@ return function(core)
             if fight.target_dead and end_turn and now ~= nil and now.can_act then
                 local short = now.attack == nil or now.ap < now.attack.ap_cost
                 if short or next(hostiles(true)) == nil then
-                    fight.turns_ended = fight.turns_ended + 1
                     fight.ended_turn_after = true
-                    if not pass_turn() then
+                    local ready = pass_turn()
+                    next_turn()
+                    if not ready then
                         fight.stopped_by = "still waiting"
                     end
                 end
             end
 
-            return done(fight)
+            return done(fight, turn)
         end,
     })
 

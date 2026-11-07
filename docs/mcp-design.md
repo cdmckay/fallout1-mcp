@@ -149,7 +149,7 @@ This view comes back from every combat action, and from `state` during combat.
     - the AP cost to reload.
   - Armor, and quick-use items such as stimpaks, with their counts.
 - **Each visible critter:**
-  - id and name, and distance in hexes (`tile_dist`);
+  - id and name, and distance in hexes as the game's range checks count it (`obj_dist`): a multi-hex critter, such as a mole rat, radscorpion, brahmin or deathclaw, covers the hexes around its tile, so it's a hex nearer than `tile_dist` says, and a melee weapon reaches it at 1 (#34);
   - whether it will attack (`hostile`, below), in and out of combat;
   - health, as the examine text would give it (`protinst.cc`): one of five descriptions ("uninjured" down to "almost dead"), or exact HP plus its weapon and ammo if you have the Awareness perk. Omniscient mode always gives exact HP;
   - knocked down or crippled;
@@ -168,7 +168,7 @@ This view comes back from every combat action, and from `state` during combat.
 - **Where:** map name, elevation, and game date and time.
 - **You:** HP, level and XP to the next level, and status.
 - **Nearby**, grouped:
-  - critters (with health as above, and whether they can be talked to, `obj_action_can_talk_to`);
+  - critters (with health as above, and whether they answer when talked to, below);
   - items on the ground;
   - containers;
   - doors;
@@ -182,7 +182,7 @@ Built (#14): `objects` in the view lists the nearest dozen things a player can s
 - `body` and `container`: `loot`, then `take`;
 - `door` and `scenery` that can be used: `use`.
 
-The text map marks each kind with the legend's symbol: `*`, `%`, `=`, `+` and `!`. Doors and containers say whether they're open. A lock can't be seen, so fair play says `locked` only once the player has tried it; omniscient mode always says. Every action walks up first, through the game's own action, so it runs when far off and costs AP in combat. Critters carry `can_talk` out of combat, from `obj_action_can_talk_to`, which is every living critter; `talk` waits for dialog.
+The text map marks each kind with the legend's symbol: `*`, `%`, `=`, `+` and `!`. Doors and containers say whether they're open. A lock can't be seen, so fair play says `locked` only once the player has tried it; omniscient mode always says. Every action walks up first, through the game's own action, so it runs when far off and costs AP in combat. Critters carry `can_talk` out of combat (#33). The game offers Talk on every living critter (`obj_action_can_talk_to`), but only a script answers: one with a `talk_p_proc`, or, in older scripts such as Aradesh's, `start`, which the game runs instead. That can't be seen from outside, so a scripted person counts and a creature doesn't (`src/mcp/talk_rules.h`). `talk` waits for dialog.
 
 ### Other screens
 

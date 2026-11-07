@@ -306,6 +306,8 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/sight_rules.h"
     "src/mcp/socket_server.cc"
     "src/mcp/socket_server.h"
+    "src/mcp/talk_rules.cc"
+    "src/mcp/talk_rules.h"
 )
 
 if(IOS)

@@ -284,6 +284,26 @@ function tests.fair_play_shows_critters_on_screen_with_a_health_word_not_hp()
     equal(critters[1].hit_chance, nil, "no odds outside combat")
 end
 
+-- Issue #34: in play test 4 the greater mole rats were listed two hexes off,
+-- yet brass knuckles reached them. A multi-hex critter covers the hexes
+-- around its tile, and the distance is the one the game's range checks use.
+function tests.a_multi_hex_critter_is_as_near_as_its_nearest_hex()
+    local state = fresh_state()
+    fake_game({
+        critters = {
+            critter({ id = 7, tile = 97 }),
+            critter({ id = 8, name = "Greater Mole Rat", tile = 98, multihex = true }),
+        },
+        on_screen = { [97] = { 400, 300 }, [98] = { 410, 300 } },
+    })
+
+    local critters = state.view().critters
+
+    equal(critters[1].id, 8, "the mole rat first")
+    equal(critters[1].distance, 1, "in reach, though its tile is two hexes off")
+    equal(critters[2].distance, 3, "the rat")
+end
+
 -- Play test 2: a rat sat three hexes away, peaceful, then attacked on the
 -- player's next move. The list says before any fight who will attack.
 function tests.critters_say_whether_they_will_attack_outside_combat_too()

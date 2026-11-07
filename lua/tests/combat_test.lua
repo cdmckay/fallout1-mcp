@@ -9,14 +9,17 @@ local tests = {}
 -- a punch costs 3. Each attack lands, and the rat dies after `hits` of them.
 -- Ending the turn hands it to the others for a few frames, which may hurt
 -- the player or change the scene (`on_enemy_turn`), and back with full AP.
--- As in the game, a turn with no AP left ends by itself a moment later. The
--- fight ends when a turn ends with no one hostile left fighting, as the game
--- ends it. Other critters are fighting unless they say otherwise.
+-- As in the game, a turn with no AP left ends by itself a moment later, or
+-- with `turn_ends_at_once` as the last attack finishes, before the player's
+-- side ever looks, as it does in the game when no one is waiting to join the
+-- fight. The fight ends when a turn ends with no one hostile left fighting,
+-- as the game ends it. Other critters are fighting unless they say otherwise.
 local function setup(options)
     options = options or {}
     local core, engine = support.new({ omniscient = options.omniscient })
     local fight = {
         active = options.in_combat ~= false,
+        turn_number = options.in_combat ~= false and 1 or 0,
         can_act = options.can_act ~= false,
         animating_frames = 0,
         enemy_frames = 0,
@@ -59,13 +62,19 @@ local function setup(options)
     end
 
     fo.flags = function()
+        if fight.game_over then
+            return { main_menu = true }
+        end
         return { in_game = true, combat = fight.active }
     end
     fo.player = function()
+        if fight.game_over then
+            return nil
+        end
         return { name = "Max Stone", tile = 100, hp = fight.hp, max_hp = 30 }
     end
     fo.combat = function()
-        if not fight.active then
+        if not fight.active or fight.game_over then
             return nil
         end
         local attack = { weapon = "unarmed", mode = "punch", ap_cost = 3, range = 1, aiming = false }
@@ -75,6 +84,7 @@ local function setup(options)
         end
         return {
             turn = fight.can_act and "Max Stone" or "Rat",
+            turn_number = fight.turn_number,
             can_act = fight.can_act,
             animating = fight.animating_frames > 0,
             ap = fight.ap,
@@ -84,6 +94,9 @@ local function setup(options)
         }
     end
     fo.critters = function()
+        if fight.game_over then
+            error("no game in progress")
+        end
         local list = {}
         for _, critter in ipairs(critters()) do
             local entry = {}
@@ -146,6 +159,7 @@ local function setup(options)
     fo.start_fight = function(id)
         fight.started[#fight.started + 1] = id
         fight.active = true
+        fight.turn_number = 1
         fight.can_act = true
         hit(id)
     end
@@ -179,6 +193,9 @@ local function setup(options)
             end
             if fight.animating_frames > 0 then
                 fight.animating_frames = fight.animating_frames - 1
+                if fight.animating_frames == 0 and options.turn_ends_at_once and fight.can_act and fight.ap <= 0 then
+                    end_turn()
+                end
             elseif fight.active and fight.can_act and fight.ap <= 0 then
                 fight.spent_frames = fight.spent_frames + 1
                 if fight.spent_frames >= 2 then
@@ -192,6 +209,7 @@ local function setup(options)
                     if options.on_enemy_turn then
                         options.on_enemy_turn(fight)
                     end
+                    fight.turn_number = fight.turn_number + 1
                     fight.can_act = true
                     fight.ap = 8
                 end
@@ -315,6 +333,55 @@ function tests.an_attack_that_uses_the_last_AP_waits_out_the_turn_the_game_passe
     equal(view.attacks.stopped_by, nil, "nothing else stopped it")
 end
 
+-- Issue #32: in play test 4, with no one waiting to join the fight, the game
+-- ended the turn as the last punch finished and played out the mole rats'
+-- turns before the attack looked again. It took the player's next turn, AP
+-- refilled, for the same one, and punched on into it.
+function tests.a_turn_the_game_ends_before_the_player_could_act_is_counted()
+    local fight, call = setup({ ap = 6, hits = 5, turn_ends_at_once = true })
+
+    local view = call("attack", { target = 7, end_turn = false, min_hp = 0 })
+
+    equal(#fight.attacks, 2, "no attack on the next turn")
+    equal(view.attacks.turns_ended, 1, "the turn the game ended")
+    equal(view.attacks.stopped_by, "out of AP", "stopped by")
+    equal(view.combat.ap, 8, "the view is of the next turn")
+    contains(view.note, "your turn passed", "note")
+
+    -- One attack that uses the turn up ends it, and not the next one too.
+    fight, call = setup({ ap = 3, hits = 5, turn_ends_at_once = true })
+    view = call("attack", { target = 7, ["repeat"] = false, end_turn = false })
+    equal(view.attacks.turns_ended, 1, "turns ended by the one attack")
+    equal(view.attacks.stopped_by, "out of AP", "stopped by after one attack")
+
+    fight, call = setup({ ap = 3, hits = 5, turn_ends_at_once = true })
+    view = call("attack", { target = 7, ["repeat"] = false })
+    equal(#fight.attacks, 1, "one attack")
+    equal(view.attacks.turns_ended, 1, "with end_turn, still one turn ended")
+    equal(fight.turn_number, 2, "the turn after the attack's is still on")
+    equal(view.combat.ap, 8, "with its AP")
+
+    -- Fighting on, each turn counts once: two punches, the rat's turn, then
+    -- the third punch and the turn ended so the game can end the fight.
+    fight, call = setup({ ap = 6, hits = 3, turn_ends_at_once = true })
+    view = call("attack", { target = 7 })
+    equal(#fight.attacks, 3, "attacks fighting on")
+    equal(view.attacks.target_dead, true, "the rat is dead")
+    equal(view.attacks.turns_ended, 2, "turns ended fighting on")
+end
+
+-- Opening a fight with an attack that uses the whole turn: the game passes it.
+function tests.an_opening_attack_that_uses_the_turn_up_counts_it()
+    local fight, call = setup({ in_combat = false, ap = 3, hits = 5, turn_ends_at_once = true })
+
+    local view = call("attack", { target = 7, end_turn = false })
+
+    equal(fight.started[1], 7, "fight started on the target")
+    equal(view.attacks.made, 1, "the opening attack alone")
+    equal(view.attacks.turns_ended, 1, "the turn the game ended")
+    equal(view.attacks.stopped_by, "out of AP", "stopped by")
+end
+
 function tests.a_hostile_critter_coming_into_sight_stops_it_before_the_turn_ends()
     local known = { id = 9, name = "Rat", tile = 106, visible = true, dead = false, hostile = true, far = true }
     local fight, call = setup({
@@ -350,6 +417,25 @@ function tests.a_critter_joining_out_of_sight_doesnt_stop_it()
 
     equal(view.attacks.target_dead, true, "fought on")
     equal(view.attacks.stopped_by, nil, "stopped by")
+end
+
+-- Play test of #32: the mole rats killed the player during their turn, and
+-- the call came back with an error rather than the view.
+function tests.the_player_dying_in_the_others_turn_ends_the_call_with_the_view()
+    local _, call = setup({
+        ap = 6,
+        hits = 10,
+        turn_ends_at_once = true,
+        on_enemy_turn = function(fight)
+            fight.game_over = true
+        end,
+    })
+
+    local view, err = call("attack", { target = 7, min_hp = 0 })
+
+    equal(err, nil, "error")
+    equal(view.attacks.stopped_by, "the fight ended", "stopped by")
+    equal(view.mode, "main_menu", "mode")
 end
 
 function tests.HP_low_stops_it()
