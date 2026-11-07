@@ -46,8 +46,20 @@ local function fake_game(options)
         end
         return nil
     end
+    -- Exits can be walked into unless a test says not, and are visible when
+    -- their tile is on screen, unless a test hides them behind something.
     fo.exits = function()
-        return options.exits or {}
+        local exits = {}
+        for i, exit in ipairs(options.exits or {}) do
+            exits[i] = {
+                tile = exit.tile,
+                map = exit.map,
+                seen = exit.seen,
+                visible = on_screen[exit.tile] ~= nil and exit.visible ~= false,
+                reachable = exit.reachable ~= false,
+            }
+        end
+        return exits
     end
     fo.critters = function()
         return options.critters or {}
@@ -223,11 +235,33 @@ function tests.an_exit_once_seen_stays_listed_until_the_map_changes()
     equal(#state.view().exits, 0, "forgotten on a new map")
 end
 
-function tests.omniscient_mode_lists_every_exit()
+function tests.only_exits_a_player_could_walk_into_and_see_are_listed()
+    local state = fresh_state()
+    fake_game({
+        exits = {
+            -- Out in the dark past the map's edge, behind the first row of
+            -- exits: nobody walks into it.
+            { tile = 85, map = -1, seen = false, reachable = false },
+            -- On screen, but behind a ridge of rock.
+            { tile = 70, map = 7, seen = false, visible = false },
+            -- Seen on the automap, but beyond the edge too.
+            { tile = 60, map = 9, seen = true, reachable = false },
+        },
+        on_screen = { [85] = { 300, 600 }, [70] = { 200, 300 } },
+    })
+
+    equal(#state.view().exits, 0, "exits listed")
+end
+
+function tests.omniscient_mode_lists_every_exit_a_player_could_walk_into()
     local state = fresh_state()
     fake_game({
         omniscient = true,
-        exits = { { tile = 99, map = 9, seen = false }, { tile = 60, map = 7, seen = false } },
+        exits = {
+            { tile = 99, map = 9, seen = false },
+            { tile = 60, map = 7, seen = false },
+            { tile = 50, map = 5, seen = false, reachable = false },
+        },
     })
 
     local exits = state.view().exits

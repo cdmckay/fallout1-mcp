@@ -79,7 +79,10 @@ end
 local known_exits = { map = nil, by_destination = {} }
 
 -- Records the exits a player can see from here: in fair play those whose
--- tiles are on screen or have been seen; omniscient mode, all of them.
+-- tiles a player can see on screen, as the text map draws them, or has seen;
+-- omniscient mode, all of them. Only exits a player could walk into count: a
+-- map's edge often has a second row of exit grids out in the dark past the
+-- first, which nobody reaches.
 function state.see_exits(player)
     local map = player.map and player.map.file or nil
     if known_exits.map ~= map then
@@ -88,7 +91,7 @@ function state.see_exits(player)
 
     local omniscient = fo.omniscient()
     for _, exit in ipairs(fo.exits()) do
-        if omniscient or exit.seen or fo.tile_center(exit.tile) ~= nil then
+        if exit.reachable and (omniscient or exit.seen or exit.visible) then
             local tiles = known_exits.by_destination[exit.map]
             if tiles == nil then
                 tiles = {}

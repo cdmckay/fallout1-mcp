@@ -400,15 +400,19 @@ static int fo_tile_direction(lua_State* L)
 }
 
 // fo.exits(): every exit grid on the player's elevation, as
-// { tile, map, seen }. `map` is the destination's index, 0 or less for the
-// world map; `seen` is whether the player has seen that tile. Exit grids are
-// invisible in play, so lua/mcp/state.lua decides which of them a player
-// would know about.
+// { tile, map, seen, visible, reachable }. `map` is the destination's index,
+// 0 or less for the world map; `seen` is whether the player has seen that
+// tile, `visible` whether a player can see it on screen now (mcp_hex_visible),
+// and `reachable` whether they could walk into it from here, opening doors on
+// the way if need be. Exit grids are invisible in play, so lua/mcp/state.lua
+// decides which of them a player would know about.
 static int fo_exits(lua_State* L)
 {
     if (!in_game()) {
         return luaL_error(L, "no game in progress");
     }
+
+    std::vector<bool> reachable = mcp_reachable_tiles(obj_dude->elevation, true);
 
     lua_newtable(L);
     int count = 0;
@@ -418,10 +422,18 @@ static int fo_exits(lua_State* L)
             continue;
         }
 
-        lua_createtable(L, 0, 3);
+        int x = -1;
+        int y = -1;
+        bool visible = obj->tile != -1
+            && tile_coord(obj->tile, &x, &y, obj->elevation) == 0
+            && mcp_hex_visible(obj->tile, x + 16, y + 8);
+
+        lua_createtable(L, 0, 5);
         set_int(L, "tile", obj->tile);
         set_int(L, "map", obj->data.misc.map);
         set_bool(L, "seen", (obj->flags & OBJECT_SEEN) != 0);
+        set_bool(L, "visible", visible);
+        set_bool(L, "reachable", obj->tile != -1 && reachable[obj->tile]);
         lua_rawseti(L, -2, ++count);
     }
 
