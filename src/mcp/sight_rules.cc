@@ -37,4 +37,14 @@ bool mcp_enough_shows(int own, int shown)
     return own > 0 && shown >= mcp_pixels_needed(own);
 }
 
+bool mcp_ground_hidden(const std::vector<McpCover>& covers)
+{
+    for (const McpCover& cover : covers) {
+        if (cover.solid && !cover.flat && !cover.seeThrough && cover.inFront) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace fallout

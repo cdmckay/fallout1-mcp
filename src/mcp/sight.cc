@@ -68,6 +68,50 @@ static bool drawn_on_top(Object* object, int x, int y)
     return mcp_target_on_top(layers);
 }
 
+bool mcp_hex_visible(int tile, int x, int y)
+{
+    if (!mcp_point_visible(x, y)) {
+        return false;
+    }
+
+    // Where the hex sits on screen, to tell what stands in front of it.
+    int hexX;
+    int hexY;
+    tile_coord(tile, &hexX, &hexY, obj_dude->elevation);
+
+    ObjectWithFlags* entries;
+    int count = obj_create_intersect_list(x, y, obj_dude->elevation, -1, &entries);
+
+    std::vector<McpCover> covers;
+    covers.reserve(count);
+    for (int index = 0; index < count; index++) {
+        Object* object = entries[index].object;
+        int flags = entries[index].flags;
+        if ((flags & kPointOpaque) == 0) {
+            continue;
+        }
+
+        int type = FID_TYPE(object->fid);
+        McpCover cover;
+        cover.solid = type == OBJ_TYPE_WALL
+            || (type == OBJ_TYPE_SCENERY && (object->flags & OBJECT_NO_BLOCK) == 0);
+        cover.flat = (object->flags & OBJECT_FLAT) != 0;
+        cover.seeThrough = (flags & (kPointTranslucent | kPointInEgg)) != 0;
+
+        int objectX;
+        int objectY;
+        tile_coord(object->tile, &objectX, &objectY, object->elevation);
+        cover.inFront = objectY > hexY;
+        covers.push_back(cover);
+    }
+
+    if (count != 0) {
+        obj_delete_intersect_list(&entries);
+    }
+
+    return !mcp_ground_hidden(covers);
+}
+
 bool mcp_object_visible(Object* object)
 {
     if (object == nullptr

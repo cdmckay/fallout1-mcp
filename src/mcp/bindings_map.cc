@@ -1,5 +1,6 @@
 #include "mcp/bindings.h"
 
+#include <cstring>
 #include <unordered_map>
 #include <vector>
 
@@ -67,9 +68,18 @@ static const char* terrain_at(int tile, int elevation)
 // at one: the move cursor shows an X over a hex `make_path` finds no way to.
 // This walks out from the player the way make_path goes, past anything that
 // doesn't block, and closed doors block the player there too. Critters
-// don't count, since they move.
-static std::vector<bool> reachable_tiles(int elevation)
+// don't count, since they move. An exit grid is as far as a walk goes:
+// stepping onto one leaves the map, so what lies past it, often the dark
+// beyond a map's edge, is out of reach.
+std::vector<bool> mcp_reachable_tiles(int elevation, bool throughDoors)
 {
+    std::vector<bool> exits(HEX_GRID_SIZE, false);
+    for (Object* obj = obj_find_first_at(elevation); obj != nullptr; obj = obj_find_next_at()) {
+        if (obj->tile != -1 && is_exit(obj)) {
+            exits[obj->tile] = true;
+        }
+    }
+
     std::vector<bool> reachable(HEX_GRID_SIZE, false);
     std::vector<int> queue { obj_dude->tile };
     reachable[obj_dude->tile] = true;
@@ -82,12 +92,16 @@ static std::vector<bool> reachable_tiles(int elevation)
             }
 
             Object* blocker = obj_blocking_at(obj_dude, next, elevation);
-            if (blocker != nullptr && FID_TYPE(blocker->fid) != OBJ_TYPE_CRITTER) {
+            if (blocker != nullptr
+                && FID_TYPE(blocker->fid) != OBJ_TYPE_CRITTER
+                && !(throughDoors && FID_TYPE(blocker->fid) == OBJ_TYPE_SCENERY && obj_is_a_portal(blocker))) {
                 continue;
             }
 
             reachable[next] = true;
-            queue.push_back(next);
+            if (!exits[next]) {
+                queue.push_back(next);
+            }
         }
     }
 
@@ -97,11 +111,12 @@ static std::vector<bool> reachable_tiles(int elevation)
 // fo.hexes(): every hex whose centre is in the map view, as
 // { tile, x, y, visible, terrain, reachable, exit, item, item_visible }.
 // `x` and `y` place it relative to the player's hex, x in half hexes to the
-// right and y in rows down. `visible` is whether a player can see the hex's
-// centre; `terrain` is "wall", "door", "floor" or "none", and `reachable`
-// whether the player can walk there. `item` is whether an item lies there,
-// and `item_visible` whether a player can see one. Critters come from
-// fo.critters.
+// right and y in rows down. `visible` is whether a player can see the hex
+// (mcp_hex_visible); `terrain` is "wall", "door", "floor" or "none", and
+// `reachable` whether the player can walk there. `exit` is whether there's
+// an exit grid a player could walk into, opening doors on the way if need
+// be. `item` is whether an item lies there, and `item_visible` whether a
+// player can see one. Critters come from fo.critters.
 static int fo_hexes(lua_State* L)
 {
     if (!mcp_in_game()) {
@@ -126,7 +141,8 @@ static int fo_hexes(lua_State* L)
         }
     }
 
-    std::vector<bool> reachable = reachable_tiles(elevation);
+    std::vector<bool> reachable = mcp_reachable_tiles(elevation, false);
+    std::vector<bool> pastDoors = mcp_reachable_tiles(elevation, true);
 
     int playerX;
     int playerY;
@@ -170,7 +186,7 @@ static int fo_hexes(lua_State* L)
                 if (found->second.door) {
                     terrain = "door";
                 }
-                exit = found->second.exit;
+                exit = found->second.exit && pastDoors[tile];
                 item = !found->second.items.empty();
                 for (Object* obj : found->second.items) {
                     if (mcp_object_visible(obj)) {
@@ -184,7 +200,11 @@ static int fo_hexes(lua_State* L)
             set_int(L, "tile", tile);
             set_int(L, "x", column);
             set_int(L, "y", row);
-            set_bool(L, "visible", mcp_point_visible(x, y));
+            // A wall's segments are drawn over one another along its length,
+            // and over what's behind it, but a player sees wall there all the
+            // same. Only a roof hides one.
+            bool solid = strcmp(terrain, "wall") == 0 || strcmp(terrain, "door") == 0;
+            set_bool(L, "visible", solid ? mcp_point_visible(x, y) : mcp_hex_visible(tile, x, y));
             set_string(L, "terrain", terrain);
             set_bool(L, "reachable", reachable[tile]);
             set_bool(L, "exit", exit);

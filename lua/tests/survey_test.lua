@@ -38,7 +38,7 @@ local function setup()
         return nil
     end
     fo.exits = function()
-        return { { tile = 5000, map = -1, seen = false } }
+        return { { tile = 5000, map = -1, seen = false, visible = view.center == EAST, reachable = true } }
     end
     fo.critters = function()
         return { { id = 7, name = "Cave Rat", tile = 6000, hidden = false, visible = view.center == EAST, dead = false, health = "Unhurt" } }

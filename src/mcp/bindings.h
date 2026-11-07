@@ -1,6 +1,8 @@
 #ifndef FALLOUT_MCP_BINDINGS_H_
 #define FALLOUT_MCP_BINDINGS_H_
 
+#include <vector>
+
 struct lua_State;
 
 namespace fallout {
@@ -25,6 +27,11 @@ void mcp_register_character_bindings(lua_State* L);
 
 // The text map's bindings (bindings_map.cc), added to the same table.
 void mcp_register_map_bindings(lua_State* L);
+
+// The hexes the player could walk to from where they stand, by tile
+// (bindings_map.cc). A walk stops at an exit grid, which leaves the map. With
+// `throughDoors`, closed doors don't stop it, as a player could open them.
+std::vector<bool> mcp_reachable_tiles(int elevation, bool throughDoors);
 
 // The walking bindings (bindings_walk.cc), added to the same table.
 void mcp_register_walk_bindings(lua_State* L);

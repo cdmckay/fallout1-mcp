@@ -218,6 +218,7 @@ The rule:
 
 - **A point** is visible when it's in the map view, above the interface bar, with no roof drawn over it (except where the egg cuts the roof away), as `object_under_mouse` has it.
 - **A critter or item** is visible when at least a quarter of its own pixels show at visible points, with nothing drawn over them. "Drawn over" comes from `obj_create_intersect_list`, the list the game uses to find what's under the mouse. Translucent things and walls cut away by the egg don't hide what's behind them.
+- **A hex** is visible when its centre is a visible point and nothing solid standing in front of it, on a hex lower on screen, is drawn there (#35). Solid means a wall, or scenery that blocks the way: a rock face, a closed door. That hides a building's floor behind its front walls and a corridor behind a ridge of rock, as the screen does. What stands behind a hex doesn't hide it, though its art may spill over it, as a rock face's rubble does onto the floor at its foot. Walls and doors are seen wherever no roof covers them: a wall's segments overlap along its length, and a player sees wall there all the same.
 
 `fo.critters` and `fo.hexes` carry the engine's `visible` flag. `lua/mcp/sight.lua` is the one place that applies it: fair play sees what's visible, and omniscient mode sees everything. The critter list and the text map both go through it, so they always agree.
 
@@ -227,6 +228,7 @@ The rule:
 
 - **Layout.** Each line is a row of hexes as they sit on screen, offset half a hex from the next, so odd columns sit half a row down. `walk_to`'s directions stay straight: e and w are two characters along a line; ne, se, sw and nw are a line up or down and a character across; n and s are straight up and down.
 - **Floor.** Floor is drawn only where the player can walk. That's what the game's move cursor tells a player who points at a hex: it shows an X where `make_path` finds no way. A breadth-first walk from the player answers it for the whole screen at once. In a cave this leaves the rock blank (it's floor art the player can't reach), so the corridors stand out between their walls.
+- **Exits.** The walk stops at an exit grid, since stepping onto one leaves the map. So the dark past a map's edge, behind its row of exit grids, isn't floor, and a second row of exits out there isn't drawn or listed (#35). An exit counts if the player could walk into it, opening doors on the way: the Vault 13 door's exit stays.
 - **Walls.** Walls and doors are drawn where they border that floor.
 - **Critters** get letters keyed to their ids, nearest first, in fair play only those `critters` lists.
 - **Why on `look`.** `look` is the call for getting one's bearings, so one call gives the picture and the map. A separate `map` tool would mean two calls at every new scene.
