@@ -76,6 +76,17 @@ int item_w_can_unload(Object* weapon);
 Object* item_w_unload(Object* weapon);
 int item_w_primary_mp_cost(Object* weapon);
 int item_w_secondary_mp_cost(Object* weapon);
+
+// MCP: item_w_damage's range, item_w_range, item_w_mp_cost and
+// item_w_called_shot for a weapon that needn't be in the critter's hand (or
+// null, for no weapon), so the inventory can say what each weapon would do
+// before it's equipped. `hit_mode` says which of the weapon's attacks, as
+// for a weapon in hand.
+void item_w_damage_range_weap(Object* critter, Object* weapon, int hit_mode, int* min_damage_ptr, int* max_damage_ptr);
+int item_w_range_weap(Object* critter, Object* weapon, int hit_mode);
+int item_w_mp_cost_weap(Object* critter, Object* weapon, int hit_mode, bool aiming);
+int item_w_called_shot_weap(Object* critter, Object* weapon, int hit_mode);
+
 int item_ar_ac(Object* armor);
 int item_ar_dr(Object* armor, int damageType);
 int item_ar_dt(Object* armor, int damageType);

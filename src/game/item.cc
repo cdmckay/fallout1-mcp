@@ -1053,15 +1053,28 @@ int item_w_damage(Object* critter, int hit_mode)
 {
     int min_damage = 0;
     int max_damage = 0;
-    int bonus_damage = 0;
-    int subtype;
 
     if (critter == NULL) {
         return 0;
     }
 
     // NOTE: Uninline.
-    Object* weapon = item_hit_with(critter, hit_mode);
+    // MCP: The range is item_w_damage_range_weap, for a weapon in any hand or
+    // none.
+    item_w_damage_range_weap(critter, item_hit_with(critter, hit_mode), hit_mode, &min_damage, &max_damage);
+
+    return roll_random(min_damage, max_damage);
+}
+
+// MCP: The damage item_w_damage rolls between, for `weapon` rather than the
+// one in the hand `hit_mode` names: the weapon's own, plus the critter's
+// melee damage for a melee or unarmed attack.
+void item_w_damage_range_weap(Object* critter, Object* weapon, int hit_mode, int* min_damage_ptr, int* max_damage_ptr)
+{
+    int min_damage = 0;
+    int max_damage = 0;
+    int bonus_damage = 0;
+    int subtype;
 
     if (weapon != NULL) {
         // NOTE: Uninline.
@@ -1076,7 +1089,8 @@ int item_w_damage(Object* critter, int hit_mode)
         max_damage = stat_level(critter, STAT_MELEE_DAMAGE) + 2;
     }
 
-    return roll_random(min_damage, bonus_damage + max_damage);
+    *min_damage_ptr = min_damage;
+    *max_damage_ptr = bonus_damage + max_damage;
 }
 
 // 0x46AD4C
@@ -1335,13 +1349,18 @@ int item_w_reload(Object* weapon, Object* ammo)
 // 0x46B104
 int item_w_range(Object* critter, int hit_mode)
 {
-    Object* weapon;
+    // NOTE: Uninline.
+    // MCP: The rest is item_w_range_weap, for a weapon in any hand or none.
+    return item_w_range_weap(critter, item_hit_with(critter, hit_mode), hit_mode);
+}
+
+// MCP: item_w_range, for `weapon` rather than the one in the hand `hit_mode`
+// names.
+int item_w_range_weap(Object* critter, Object* weapon, int hit_mode)
+{
     Proto* proto;
     int range;
     int max_range;
-
-    // NOTE: Uninline.
-    weapon = item_hit_with(critter, hit_mode);
 
     if (weapon == NULL || hit_mode == HIT_MODE_PUNCH || hit_mode == HIT_MODE_KICK) {
         return 1;
@@ -1375,7 +1394,15 @@ int item_w_range(Object* critter, int hit_mode)
 // 0x46B1E8
 int item_w_mp_cost(Object* critter, int hit_mode, bool aiming)
 {
-    Object* weapon;
+    // NOTE: Uninline.
+    // MCP: The rest is item_w_mp_cost_weap, for a weapon in any hand or none.
+    return item_w_mp_cost_weap(critter, item_hit_with(critter, hit_mode), hit_mode, aiming);
+}
+
+// MCP: item_w_mp_cost, for `weapon` rather than the one in the hand
+// `hit_mode` names.
+int item_w_mp_cost_weap(Object* critter, Object* weapon, int hit_mode, bool aiming)
+{
     int action_points;
     int weapon_subtype;
 
@@ -1383,8 +1410,6 @@ int item_w_mp_cost(Object* critter, int hit_mode, bool aiming)
         return 2;
     }
 
-    // NOTE: Uninline.
-    weapon = item_hit_with(critter, hit_mode);
     if (weapon == NULL || hit_mode == HIT_MODE_PUNCH || hit_mode == HIT_MODE_KICK) {
         action_points = 3;
     } else {
@@ -1538,8 +1563,17 @@ char item_w_sound_id(Object* weapon)
 // 0x46B450
 int item_w_called_shot(Object* critter, int hit_mode)
 {
+    // NOTE: Uninline.
+    // MCP: The rest is item_w_called_shot_weap, for a weapon in any hand or
+    // none.
+    return item_w_called_shot_weap(critter, item_hit_with(critter, hit_mode), hit_mode);
+}
+
+// MCP: item_w_called_shot, for `weapon` rather than the one in the hand
+// `hit_mode` names.
+int item_w_called_shot_weap(Object* critter, Object* weapon, int hit_mode)
+{
     int anim;
-    Object* weapon;
     int damage_type;
 
     if (critter == obj_dude) {
@@ -1548,14 +1582,11 @@ int item_w_called_shot(Object* critter, int hit_mode)
         }
     }
 
-    // NOTE: Uninline.
-    anim = item_w_anim(critter, hit_mode);
+    anim = item_w_anim_weap(weapon, hit_mode);
     if (anim == ANIM_FIRE_BURST || anim == ANIM_FIRE_CONTINUOUS) {
         return 0;
     }
 
-    // NOTE: Uninline.
-    weapon = item_hit_with(critter, hit_mode);
     damage_type = item_w_damage_type(weapon);
 
     if (damage_type == DAMAGE_TYPE_EXPLOSION
