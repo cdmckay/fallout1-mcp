@@ -23,10 +23,39 @@ return function(core)
         return { data = state.view() }
     end
 
-    local function check_item(args)
-        if math.type(args.item) ~= "integer" then
-            core.fail("item must be an item's id from the inventory tool")
+    -- The id of the item `item` names: an id, or a name as the inventory
+    -- lists it, in any case. Fails unless exactly one item goes by that name.
+    -- A stack's id changes each time one is taken from it, so the name is
+    -- the easier way to use the next stimpak.
+    local function resolve_item(item)
+        if math.type(item) == "integer" then
+            return item
         end
+        if type(item) ~= "string" or item == "" then
+            core.fail("item must be an item's id or its name, from the inventory tool")
+        end
+        if not fo.flags().in_game then
+            core.fail("there's no game in progress")
+        end
+
+        local matches = {}
+        for _, carried in ipairs(fo.inventory().items) do
+            if carried.name:lower() == item:lower() then
+                matches[#matches + 1] = carried
+            end
+        end
+
+        if #matches == 0 then
+            core.fail(("you're not carrying anything called %q"):format(item))
+        end
+        if #matches > 1 then
+            local which = {}
+            for i, carried in ipairs(matches) do
+                which[i] = carried.slot and ("%d (%s)"):format(carried.id, carried.slot) or tostring(carried.id)
+            end
+            core.fail(("%d items are called %q, ids %s; give the id of the one you mean"):format(#matches, item, table.concat(which, ", ")))
+        end
+        return matches[1].id
     end
 
     local function check_hand(args)
@@ -34,6 +63,11 @@ return function(core)
             core.fail('hand must be "left" or "right" (or left out, for the active hand)')
         end
     end
+
+    local item_schema = {
+        type = core.array({ "integer", "string" }),
+        description = "The item's id, or its name, as the inventory tool lists them.",
+    }
 
     local hand_schema = {
         type = "string",
@@ -43,7 +77,7 @@ return function(core)
 
     core.tool({
         name = "inventory",
-        description = "Everything you carry: each item's id, name, type, quantity and weight; which hand or armor slot it's in; and for weapons the ammo loaded and its type. Also the total weight and what you can carry, your caps, and which hand is active.",
+        description = "Everything you carry: each item's id, name, type, quantity and weight, and which hand or armor slot it's in. For each weapon, so you can choose one without equipping it: its attacks (primary, then secondary if it has one), each with its damage range, range in hexes, the skill it uses and its AP cost, aimed too if it can be aimed, all with your perks and traits applied, as the interface bar gives them once it's in a hand; its minimum Strength (each point you're short costs 20% to hit); two_handed if it takes both hands; and the ammo loaded, its type and the capacity. `unarmed` is the same for a punch with an empty hand. Also the total weight and what you can carry, your caps, and which hand is active.",
         run = function()
             return { data = fo.inventory() }
         end,
@@ -51,15 +85,14 @@ return function(core)
 
     core.tool({
         name = "equip",
-        description = "Puts an item from your inventory to use: armor on your body, a weapon or anything else in a hand (the active hand unless you say). No inventory screen needed. In combat this costs 4 AP, as opening the inventory does, and only on your turn. Returns the state view.",
+        description = "Puts an item from your inventory to use: armor on your body, a weapon or anything else in a hand (the active hand unless you say). Name the item by its id or its name; a name two of your items share needs the id. No inventory screen needed. In combat this costs 4 AP, as opening the inventory does, and only on your turn. Returns the state view.",
         schema = core.schema({
-            item = { type = "integer", description = "The item's id, from the inventory tool." },
+            item = item_schema,
             hand = hand_schema,
         }, { "item" }),
         run = function(args)
-            check_item(args)
             check_hand(args)
-            return act(fo.equip, args.item, args.hand)
+            return act(fo.equip, resolve_item(args.item), args.hand)
         end,
     })
 
@@ -85,21 +118,21 @@ return function(core)
 
     core.tool({
         name = "use_item",
-        description = "Uses an item from your inventory on yourself. So far that means drugs, such as stimpaks to heal; one at full health is wasted, as in the game. In combat this costs 4 AP, as opening the inventory does. Returns the state view (its messages say what the item did) and `used`: how many are left and their id, which changes when one is taken from a stack.",
+        description = "Uses an item from your inventory on yourself. So far that means drugs, such as stimpaks to heal; one at full health is wasted, as in the game. Name the item by its id or its name, such as \"Stimpak\"; a name two of your items share needs the id. A stack's id changes each time one is taken from it, so the name is the easy way to use the next one. In combat this costs 4 AP, as opening the inventory does. Returns the state view (its messages say what the item did) and `used`: how many are left and their id.",
         schema = core.schema({
-            item = { type = "integer", description = "The item's id, from the inventory tool." },
+            item = item_schema,
         }, { "item" }),
         run = function(args)
-            check_item(args)
+            local id = resolve_item(args.item)
 
             local before
             for _, item in ipairs(fo.inventory().items) do
-                if item.id == args.item then
+                if item.id == id then
                     before = item
                 end
             end
 
-            local result = act(fo.use_item, args.item)
+            local result = act(fo.use_item, id)
 
             -- Taking one from a stack leaves the rest in a copy with a new
             -- id, so say where the rest went.

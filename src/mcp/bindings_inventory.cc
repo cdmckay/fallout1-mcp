@@ -4,6 +4,7 @@
 
 #include <lua.hpp>
 
+#include "game/anim.h"
 #include "game/combat.h"
 #include "game/gsound.h"
 #include "game/intface.h"
@@ -13,6 +14,7 @@
 #include "game/perk.h"
 #include "game/protinst.h"
 #include "game/proto.h"
+#include "game/skill.h"
 #include "game/stat.h"
 #include "mcp/lua_fields.h"
 
@@ -131,9 +133,80 @@ static void push_item_ref(lua_State* L, Object* item)
     set_string(L, "name", object_name(item));
 }
 
-// fo.inventory(): everything the player carries, as { items, weight,
-// capacity, caps, active_hand, screen_open }. Each item has id, name, type,
-// quantity, weight, the slot it's in, and for weapons the ammo loaded.
+// What kind of attack it is, from the animation it plays. The interface bar
+// labels them the same way (intface_redraw_items), except that it calls a
+// punch or kick "unarmed".
+static const char* attack_name(Object* weapon, int hitMode)
+{
+    switch (item_w_anim_weap(weapon, hitMode)) {
+    case ANIM_THROW_PUNCH:
+        return "punch";
+    case ANIM_KICK_LEG:
+        return "kick";
+    case ANIM_SWING_ANIM:
+        return "swing";
+    case ANIM_THRUST_ANIM:
+        return "thrust";
+    case ANIM_THROW_ANIM:
+        return "throw";
+    case ANIM_FIRE_SINGLE:
+        return "single";
+    default:
+        // ANIM_FIRE_BURST, and a flamer's ANIM_FIRE_CONTINUOUS, which the bar
+        // shows as a burst too.
+        return "burst";
+    }
+}
+
+// One of the player's attacks with `weapon`, or bare-handed if it's null,
+// with what the game would show once it's in a hand: the damage it rolls
+// (melee and unarmed attacks add the player's melee damage, as the
+// inventory screen's "Dmg:" does), its range, and its AP cost as the
+// interface bar gives it, with the player's perks and traits applied (Fast
+// Shot, Bonus HtH Attacks, Bonus Rate of Fire), aimed as well if it can be.
+// `mode` is "primary" or "secondary", as the combat view names the selected
+// attack, or null bare-handed.
+static void push_attack(lua_State* L, Object* weapon, int hitMode, const char* mode)
+{
+    int damageMin;
+    int damageMax;
+    item_w_damage_range_weap(obj_dude, weapon, hitMode, &damageMin, &damageMax);
+
+    lua_createtable(L, 0, 8);
+    set_string(L, "mode", mode);
+    set_string(L, "attack", attack_name(weapon, hitMode));
+    set_string(L, "skill", skill_name(item_w_skill(weapon, hitMode)));
+    set_int(L, "damage_min", damageMin);
+    set_int(L, "damage_max", damageMax);
+    set_int(L, "range", item_w_range_weap(obj_dude, weapon, hitMode));
+    set_int(L, "ap_cost", item_w_mp_cost_weap(obj_dude, weapon, hitMode, false));
+    if (item_w_called_shot_weap(obj_dude, weapon, hitMode)) {
+        set_int(L, "aimed_ap_cost", item_w_mp_cost_weap(obj_dude, weapon, hitMode, true));
+    }
+}
+
+// A weapon's attacks, primary then secondary, leaving out a mode it hasn't
+// got, as cycling the interface bar does (intface_toggle_item_state).
+static void push_attacks(lua_State* L, Object* weapon)
+{
+    static const int hitModes[2] = { HIT_MODE_RIGHT_WEAPON_PRIMARY, HIT_MODE_RIGHT_WEAPON_SECONDARY };
+    static const char* modes[2] = { "primary", "secondary" };
+
+    lua_createtable(L, 2, 0);
+    int count = 0;
+    for (int index = 0; index < 2; index++) {
+        if (item_w_subtype(weapon, hitModes[index]) != ATTACK_TYPE_NONE) {
+            push_attack(L, weapon, hitModes[index], modes[index]);
+            lua_rawseti(L, -2, ++count);
+        }
+    }
+}
+
+// fo.inventory(): everything the player carries, as { items, unarmed,
+// weight, capacity, caps, active_hand, screen_open }. Each item has id,
+// name, type, quantity, weight and the slot it's in. Weapons also have
+// their attacks, minimum Strength, whether they take both hands, and the
+// ammo loaded. `unarmed` is the punch an empty hand gives.
 static int fo_inventory(lua_State* L)
 {
     if (!mcp_in_game()) {
@@ -142,20 +215,29 @@ static int fo_inventory(lua_State* L)
 
     Inventory* inventory = &(obj_dude->data.inventory);
 
-    lua_createtable(L, 0, 6);
+    lua_createtable(L, 0, 7);
     lua_createtable(L, inventory->length, 0);
     for (int index = 0; index < inventory->length; index++) {
         InventoryItem* entry = &(inventory->items[index]);
         Object* item = entry->item;
         int type = item_get_type(item);
 
-        lua_createtable(L, 0, 7);
+        lua_createtable(L, 0, 10);
         set_int(L, "id", item->id);
         set_string(L, "name", object_name(item));
         set_string(L, "type", item_type_name(type));
         set_int(L, "quantity", entry->quantity);
         set_int(L, "weight", item_weight(item));
         set_string(L, "slot", slot_name(item));
+
+        if (type == ITEM_TYPE_WEAPON) {
+            push_attacks(L, item);
+            lua_setfield(L, -2, "attacks");
+            set_int(L, "min_strength", item_w_min_st(item));
+            if (item_w_is_2handed(item)) {
+                set_bool(L, "two_handed", true);
+            }
+        }
 
         if (type == ITEM_TYPE_WEAPON && item_w_max_ammo(item) > 0) {
             lua_createtable(L, 0, 3);
@@ -171,6 +253,9 @@ static int fo_inventory(lua_State* L)
         lua_rawseti(L, -2, index + 1);
     }
     lua_setfield(L, -2, "items");
+
+    push_attack(L, nullptr, HIT_MODE_PUNCH, nullptr);
+    lua_setfield(L, -2, "unarmed");
 
     set_int(L, "weight", item_total_weight(obj_dude));
     set_int(L, "capacity", stat_level(obj_dude, STAT_CARRY_WEIGHT));
