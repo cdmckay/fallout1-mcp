@@ -9,6 +9,7 @@ A play test is a fresh Claude Code session that plays the game through the `fall
 | 1 | 2026-11-01 | the first slice | Got out of the cave. Found the equip, walk and screen-state gaps (#11–#13). |
 | 2 | 2026-11-01 | `a2c412b` | Got out in about 76 calls at 24/43 HP. About 30 calls went on dead ends and about 40 on attack/end_turn (#16–#21). |
 | 3 | 2026-11-01 | `6792149` (text map and the new `walk_to`; before the world map) | Got out in about 33 calls at full HP. Finding the exit is still guesswork (#18). Also: attack then end_turn (#19), weapon stats (#28), and a sight mismatch (#29). |
+| 4 | 2026-11-07 | `7e834c0` (world map, one-call fights, objects) | Got into Vault 15 in about 80 calls, at 32/43 HP and poisoned. The cave took about 35, 12 of them on a dead end (#18). The road took about 37: a mole rat fight down to 1 HP, rest by guessed codes, and a run from radscorpions. Found a missed turn in `attack` (#32) and #33–#40. |
 
 ## Setting one up
 
