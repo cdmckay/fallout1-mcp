@@ -91,6 +91,10 @@ static char _a_1[] = ".";
 // 0x4FEC80
 static int combat_turn_running = 0;
 
+// MCP: How many turns the player has had in this fight; see
+// combat_player_turns.
+static int mcp_player_turns = 0;
+
 // 0x4FEC84
 unsigned int combat_state = COMBAT_STATE_0x02;
 
@@ -1745,6 +1749,7 @@ static void combat_begin(Object* a1)
     combat_elev = map_elevation;
 
     if (!isInCombat()) {
+        mcp_player_turns = 0; // MCP
         combat_exps = 0;
         combat_list = NULL;
         list_total = obj_create_list(-1, combat_elev, OBJ_TYPE_CRITTER, &combat_list);
@@ -2219,6 +2224,12 @@ static int combat_turn(Object* a1, bool a2)
     Script* script;
 
     combat_turn_obj = a1;
+
+    // MCP: A new turn of the player's, even one they lose; `a2` carries on
+    // the one under way.
+    if (a1 == obj_dude && !a2) {
+        mcp_player_turns += 1;
+    }
 
     combat_ctd_init(&main_ctd, a1, NULL, HIT_MODE_PUNCH, HIT_LOCATION_TORSO);
 
@@ -4782,6 +4793,16 @@ void combat_delete_critter(Object* obj)
 bool combat_is_animating()
 {
     return combat_turn_running > 0;
+}
+
+// MCP: How many turns the player has had in this fight, counting the one
+// under way, so an agent can tell one turn from the next. AP can't: the game
+// ends a turn with no AP left by itself, and when no one is waiting to join
+// the fight, everyone else's turns play out before `process_bk` runs again,
+// so an agent's next look can be at the player's next turn, with full AP.
+int combat_player_turns()
+{
+    return mcp_player_turns;
 }
 
 // MCP: Whether `critter` is taking part in the fight, rather than a bystander

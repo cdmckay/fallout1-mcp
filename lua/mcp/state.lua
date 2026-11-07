@@ -135,7 +135,9 @@ function state.exits(player)
     return list
 end
 
--- The living critters around the player, nearest first. In fair play that's
+-- The living critters around the player, nearest first, by the distance the
+-- game's range checks use, so a melee weapon reaches one at 1 even when it's
+-- a multi-hex critter, such as a greater mole rat. In fair play that's
 -- those a player can see on screen (mcp.sight), with health as the examine
 -- text gives it: a word, or exact HP with the Awareness perk. Omniscient mode
 -- lists every critter on the elevation with exact HP. Each says whether it
@@ -153,7 +155,7 @@ function state.critters(player, in_combat)
             local entry = {
                 id = critter.id,
                 name = critter.name,
-                distance = fo.tile_distance(player.tile, critter.tile),
+                distance = fo.object_distance(critter.id),
                 direction = DIRECTION_NAMES[fo.tile_direction(player.tile, critter.tile)],
                 health = critter.health,
                 hostile = critter.hostile,

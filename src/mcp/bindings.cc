@@ -39,6 +39,7 @@
 #include "mcp/png.h"
 #include "mcp/screens.h"
 #include "mcp/sight.h"
+#include "mcp/talk_rules.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
 
@@ -392,6 +393,29 @@ static int fo_tile_distance(lua_State* L)
     return 1;
 }
 
+// fo.object_distance(id): hexes from the player to object `id` on the
+// player's elevation, as the game's range checks count them (`obj_dist`), or
+// nil if it isn't there. A multi-hex critter, such as a greater mole rat,
+// covers the hexes around its tile too, so it's a hex nearer than
+// fo.tile_distance says.
+static int fo_object_distance(lua_State* L)
+{
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    if (!in_game()) {
+        return luaL_error(L, "no game in progress");
+    }
+
+    for (Object* obj = obj_find_first_at(obj_dude->elevation); obj != nullptr; obj = obj_find_next_at()) {
+        if (obj->id == id && obj->tile != -1 && obj != obj_dude) {
+            lua_pushinteger(L, obj_dist(obj_dude, obj));
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
 // fo.tile_direction(a, b): the rotation (0 NE ... 5 NW) from `a` toward `b`.
 static int fo_tile_direction(lua_State* L)
 {
@@ -523,9 +547,11 @@ static const char* health_description(Object* critter)
     return message_search(&proto_main_msg_file, &item) ? item.text : nullptr;
 }
 
-// fo.combat(): nil outside combat; otherwise whose turn it is, whether the
-// player can act, AP and free-move AP, whether anything is still playing
-// out, and the attack the interface has selected.
+// fo.combat(): nil outside combat; otherwise whose turn it is, the number of
+// the player's turn in the fight (1 for the first, and the same through the
+// others' turns that follow it), whether the player can act, AP and
+// free-move AP, whether anything is still playing out, and the attack the
+// interface has selected.
 static int fo_combat(lua_State* L)
 {
     if (!in_game() || !isInCombat()) {
@@ -536,8 +562,9 @@ static int fo_combat(lua_State* L)
     Object* turn = combat_whose_turn();
     bool playerTurn = turn == obj_dude;
 
-    lua_createtable(L, 0, 7);
+    lua_createtable(L, 0, 8);
     set_string(L, "turn", turn != nullptr ? object_name(turn) : nullptr);
+    set_int(L, "turn_number", combat_player_turns());
     set_bool(L, "player_turn", playerTurn);
     set_bool(L, "can_act", playerTurn && (combat_state & COMBAT_STATE_0x02) != 0);
     set_bool(L, "animating", combat_is_animating() || anim_busy(obj_dude) != 0);
@@ -564,6 +591,19 @@ static int fo_combat(lua_State* L)
     }
 
     return 1;
+}
+
+// Whether talking to `critter` gets an answer (mcp/talk_rules.h). Every
+// script on the map is loaded with it, so its procedures are known.
+static bool can_talk(Object* critter)
+{
+    McpTalker talker;
+    Script* script;
+    talker.offered = obj_action_can_talk_to(critter);
+    talker.scripted = scr_ptr(critter->sid, &script) != -1;
+    talker.talkProc = talker.scripted && script->procs[SCRIPT_PROC_TALK] > 0;
+    talker.killType = critter_kill_count_type(critter);
+    return mcp_can_talk(talker);
 }
 
 // fo.critters(): every critter on the player's elevation but the player,
@@ -603,7 +643,7 @@ static int fo_critters(lua_State* L)
         set_bool(L, "crippled", critter_is_crippled(obj));
         set_bool(L, "hostile", mcp_critter_hostile(obj));
         set_bool(L, "fighting", combat_is_combatant(obj));
-        set_bool(L, "can_talk", obj_action_can_talk_to(obj));
+        set_bool(L, "can_talk", can_talk(obj));
         set_int(L, "hp", stat_level(obj, STAT_CURRENT_HIT_POINTS));
         set_int(L, "max_hp", stat_level(obj, STAT_MAXIMUM_HIT_POINTS));
         set_string(L, "health", health_description(obj));
@@ -812,6 +852,7 @@ void mcp_register_engine_bindings(lua_State* L)
         { "attack", fo_attack },
         { "approach", fo_approach },
         { "start_fight", fo_start_fight },
+        { "object_distance", fo_object_distance },
         { nullptr, nullptr },
     };
 

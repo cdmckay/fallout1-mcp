@@ -48,6 +48,18 @@ function support.quiet_world()
     fo.tile_distance = function(a, b)
         return math.abs(a - b)
     end
+    -- As the engine measures it: from the player's tile to the critter's,
+    -- less a hex for a critter a test marks `multihex`.
+    fo.object_distance = function(id)
+        local player = fo.player()
+        for _, critter in ipairs(fo.critters()) do
+            if critter.id == id then
+                local distance = fo.tile_distance(player.tile, critter.tile)
+                return math.max(critter.multihex and distance - 1 or distance, 0)
+            end
+        end
+        return nil
+    end
     fo.tile_direction = function()
         return 0
     end

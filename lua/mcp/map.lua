@@ -107,7 +107,7 @@ function map.draw(player)
                 id = critter.id,
                 name = critter.name,
                 tile = critter.tile,
-                distance = fo.tile_distance(player.tile, critter.tile),
+                distance = fo.object_distance(critter.id),
             }
         end
     end
