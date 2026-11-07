@@ -9,4 +9,5 @@ return function(core)
     require("tools.character")(core)
     require("tools.worldmap")(core)
     require("tools.objects")(core)
+    require("tools.rest")(core)
 end

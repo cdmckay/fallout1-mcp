@@ -22,6 +22,7 @@ local function setup(options)
         open = options.open or false,
         skill_points = options.skill_points or 10,
         perk_pending = options.perk_pending or false,
+        conditions = options.conditions or {},
         selected_skill = 0,
         choice = nil,
         perks = {},
@@ -133,7 +134,7 @@ local function setup(options)
             screen_open = game.open,
             special = { strength = 10, agility = 6 },
             derived = { action_points = 6 },
-            conditions = {},
+            conditions = game.conditions,
             skills = skills,
             traits = { { id = 1, name = "Bruiser", description = "Your action points are lowered." } },
             perks = game.perks,
@@ -341,6 +342,32 @@ function tests.the_character_screen_s_view_carries_the_sheet()
     equal(view.mode, "character", "mode")
     equal(view.character.name, "Max Stone", "sheet")
     equal(view.player.unspent, nil, "the sheet says it instead")
+end
+
+function tests.the_state_view_names_the_player_s_conditions()
+    setup({ conditions = { "poisoned", "crippled left leg" } })
+
+    local view = require("mcp.state").view()
+
+    equal(view.player.conditions[1], "poisoned", "poisoned")
+    equal(view.player.conditions[2], "crippled left leg", "a crippled leg")
+end
+
+function tests.a_player_with_no_conditions_has_none_listed()
+    setup()
+
+    local view = require("mcp.state").view()
+
+    equal(view.player.conditions, nil, "no conditions")
+end
+
+function tests.the_character_screen_s_sheet_names_conditions_too()
+    setup({ open = true, conditions = { "radiated" } })
+
+    local view = require("mcp.state").view()
+
+    equal(view.character.conditions[1], "radiated", "on the sheet")
+    equal(view.player.conditions[1], "radiated", "and on the player")
 end
 
 function tests.give_xp_is_for_omniscient_mode_only()

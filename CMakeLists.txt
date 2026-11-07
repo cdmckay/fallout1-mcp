@@ -283,6 +283,7 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/mcp/bindings_inventory.cc"
     "src/mcp/bindings_map.cc"
     "src/mcp/bindings_objects.cc"
+    "src/mcp/bindings_rest.cc"
     "src/mcp/bindings_walk.cc"
     "src/mcp/bindings_worldmap.cc"
     "src/mcp/combat_rules.cc"

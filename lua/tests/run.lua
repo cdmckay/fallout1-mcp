@@ -17,6 +17,7 @@ local files = {
     "tests.map_test",
     "tests.movement_test",
     "tests.objects_test",
+    "tests.rest_test",
     "tests.state_test",
     "tests.survey_test",
     "tests.worldmap_test",

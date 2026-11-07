@@ -529,6 +529,11 @@ static unsigned char holo_flag;
 // 0x662CA6
 static unsigned char stat_flag;
 
+// MCP: For pipboy_is_resting and pipboy_rest_was_interrupted: whether the
+// alarm clock is resting, and whether its last rest was cut short.
+static bool mcp_resting = false;
+static bool mcp_rest_interrupted = false;
+
 // 0x486A80
 int pipboy(int intent)
 {
@@ -1831,6 +1836,10 @@ static void PipAlarm(int a1)
     } else if (a1 >= 4 && a1 <= 17) {
         gsound_play_sfx_file("ib1p1xx1");
 
+        // MCP
+        mcp_resting = true;
+        mcp_rest_interrupted = false;
+
         DrawAlarmText(a1 - 3);
 
         int duration = a1 - 4;
@@ -1875,6 +1884,8 @@ static void PipAlarm(int a1)
             TimedRest(0, 0, duration);
             break;
         }
+
+        mcp_resting = false; // MCP
 
         gsound_play_sfx_file("ib2lu1x1");
 
@@ -2236,6 +2247,11 @@ static bool TimedRest(int hours, int minutes, int duration)
 
     gmouse_set_cursor(MOUSE_CURSOR_ARROW);
 
+    // MCP
+    if (rc) {
+        mcp_rest_interrupted = true;
+    }
+
     return rc;
 }
 
@@ -2490,6 +2506,18 @@ static void pip_note()
 
         pip_days_left(game_global_vars[GVAR_VAULT_WATER]);
     }
+}
+
+// MCP: Whether the alarm clock is resting right now.
+bool pipboy_is_resting()
+{
+    return mcp_resting;
+}
+
+// MCP: Whether the alarm clock's last rest was cut short.
+bool pipboy_rest_was_interrupted()
+{
+    return mcp_rest_interrupted;
 }
 
 } // namespace fallout

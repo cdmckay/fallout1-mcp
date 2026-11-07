@@ -822,6 +822,7 @@ void mcp_register_engine_bindings(lua_State* L)
     mcp_register_walk_bindings(L);
     mcp_register_worldmap_bindings(L);
     mcp_register_object_bindings(L);
+    mcp_register_rest_bindings(L);
 }
 
 } // namespace fallout

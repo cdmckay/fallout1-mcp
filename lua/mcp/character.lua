@@ -83,11 +83,23 @@ local function choice_view(choice)
     }
 end
 
+-- The conditions the character screen lights up under hit points (poisoned,
+-- radiated, eye damage, crippled limbs), or nil when there are none. `raw`
+-- is fo.character()'s sheet, read here when not given.
+function character.conditions(raw)
+    raw = raw or fo.character()
+    if raw == nil or #raw.conditions == 0 then
+        return nil
+    end
+    return raw.conditions
+end
+
 -- The character sheet, or nil when no game is in progress: SPECIAL, hit
 -- points and conditions, derived stats, skills (tagged ones marked), traits
--- with what they do, perks, level and XP, and what's left to spend.
-function character.sheet()
-    local raw = fo.character()
+-- with what they do, perks, level and XP, and what's left to spend. `raw`
+-- is fo.character()'s, read here when not given.
+function character.sheet(raw)
+    raw = raw or fo.character()
     if raw == nil then
         return nil
     end
@@ -101,7 +113,7 @@ function character.sheet()
         next_level_xp = raw.next_level_xp,
         hp = raw.hp,
         max_hp = raw.max_hp,
-        conditions = #raw.conditions > 0 and raw.conditions or nil,
+        conditions = character.conditions(raw),
         special = raw.special,
         derived = raw.derived,
         skills = map(raw.skills, function(skill)
@@ -122,8 +134,8 @@ function character.sheet()
 end
 
 -- What's waiting to be spent, for the state view, or nil when nothing is.
-function character.unspent()
-    local raw = fo.character()
+function character.unspent(raw)
+    raw = raw or fo.character()
     if raw == nil or (raw.skill_points == 0 and not raw.perk_pending) then
         return nil
     end
